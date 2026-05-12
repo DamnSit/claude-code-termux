@@ -235,7 +235,7 @@ ok "~/.claude/settings.json"
 # ── aliases ───────────────────────────────────────────────────
 MARK="# claude-code-termux"
 ALIAS_LINE="alias claude='grun ${CLAUDE_BIN}'"
-TMPDIR_LINE="export TMPDIR='\${TMPDIR:-${PREFIX}/tmp}'"
+TMPDIR_LINE="export TMPDIR=\"\${TMPDIR:-${PREFIX}/tmp}\""
 
 for rc in "$BASHRC" "$ZSHRC"; do
     [[ -f "$rc" ]] || touch "$rc"
