@@ -213,13 +213,27 @@ fn update() -> Result<()> {
     println!("    {}  {} Termux Native", "Claude Code Updater".bold(), "•".dim());
     println!();
 
-    // Update npm packages
+    // Check which package is installed
+    let xurxuo_installed = PathBuf::from("/data/data/com.termux/files/usr/lib/node_modules/@xurxuo/claude-code-termux").exists();
+    let anthropic_installed = PathBuf::from("/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code").exists();
+
+    // Update npm packages (settings.json TIDAK disentuh)
     println!("{} Updating packages...", "▸".yellow());
-    Command::new("npm")
-        .args(["install", "-g", "@anthropic-ai/claude-code@latest", "@anthropic-ai/claude-code-linux-arm64@latest"])
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()?;
+    println!("  └─ {} Settings preserved", "✓".green());
+
+    if xurxuo_installed {
+        Command::new("npm")
+            .args(["install", "-g", "@xurxuo/claude-code-termux@latest", "@anthropic-ai/claude-code-linux-arm64@latest"])
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()?;
+    } else if anthropic_installed {
+        Command::new("npm")
+            .args(["install", "-g", "@anthropic-ai/claude-code@latest", "@anthropic-ai/claude-code-linux-arm64@latest"])
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()?;
+    }
 
     println!("  └─ {} Packages updated", "✓".green());
     println!();
@@ -250,10 +264,11 @@ fn update() -> Result<()> {
 
 fn uninstall() -> Result<()> {
     println!("{} Uninstalling Claude Code Termux...", "▸".yellow());
+    println!("  └─ {} Settings preserved (~/.claude/settings.json)", "✓".green());
 
-    // Remove npm packages
+    // Remove npm packages (settings.json TIDAK disentuh)
     Command::new("npm")
-        .args(["uninstall", "-g", "@anthropic-ai/claude-code", "@anthropic-ai/claude-code-linux-arm64"])
+        .args(["uninstall", "-g", "@xurxuo/claude-code-termux", "@anthropic-ai/claude-code", "@anthropic-ai/claude-code-linux-arm64"])
         .output()?;
 
     println!("  └─ {} Packages removed", "✓".green());
