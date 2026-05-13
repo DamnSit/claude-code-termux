@@ -39,3 +39,12 @@ jobs:
           name: claude-termux-arm64
           path: rust-wrapper/target/aarch64-unknown-linux-gnu/release/claude-termux
           retention-days: 30
+
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: rust-wrapper/target/aarch64-unknown-linux-gnu/release/claude-termux
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
