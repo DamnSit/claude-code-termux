@@ -82,10 +82,10 @@ fn install_deps() -> Result<()> {
             .status()?;
     }
 
-    // Install npm packages
+    // Install npm packages with --force untuk skip platform check
     println!("  {} Installing Claude Code packages...", "▸".yellow());
     Command::new("npm")
-        .args(["install", "-g", "@anthropic-ai/claude-code", "@anthropic-ai/claude-code-linux-arm64"])
+        .args(["install", "-g", "--force", "@anthropic-ai/claude-code", "@anthropic-ai/claude-code-linux-arm64"])
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()?;
