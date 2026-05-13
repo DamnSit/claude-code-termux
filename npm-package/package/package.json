@@ -1,0 +1,31 @@
+{
+  "name": "@xurxuo/claude-code-termux",
+  "version": "2.1.140",
+  "bin": {
+    "claude": "bin/claude.exe"
+  },
+  "scripts": {
+    "postinstall": "node install.cjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "module",
+  "author": "XurXuo <dimarlin65@gmail.com>",
+  "license": "SEE LICENSE IN README.md",
+  "description": "Claude Code for Termux/Android - with Termux patches",
+  "homepage": "https://github.com/DamnSit/claude-code-termux",
+  "bugs": {
+    "url": "https://github.com/DamnSit/claude-code-termux/issues"
+  },
+  "dependencies": {},
+  "optionalDependencies": {
+    "@anthropic-ai/claude-code-linux-arm64": "2.1.140"
+  },
+  "files": [
+    "bin/claude.exe",
+    "install.cjs",
+    "cli-wrapper.cjs",
+    "sdk-tools.d.ts"
+  ]
+}
