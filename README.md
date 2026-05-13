@@ -93,9 +93,13 @@ Atau edit langsung `~/.claude/settings.json`:
 
 ## Update
 
-Re-run installer:
+Ada dua cara:
 
 ```bash
+# Cara 1: CLI (rekomendasi)
+claude -u
+
+# Cara 2: Re-run installer
 curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
 ```
 

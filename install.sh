@@ -232,23 +232,51 @@ printf '{\n  "env": {\n%b\n  },\n  "autoUpdatesChannel": "latest"\n}\n' \
 
 ok "~/.claude/settings.json"
 
-# ── aliases ───────────────────────────────────────────────────
+# ── wrapper ────────────────────────────────────────────────────
 MARK="# claude-code-termux"
-ALIAS_LINE="alias claude='grun ${CLAUDE_BIN}'"
 TMPDIR_LINE="export TMPDIR=\"\${TMPDIR:-${PREFIX}/tmp}\""
 
+# Copy wrapper script to bin
+WRAPPER_SRC="$(cd "$(dirname "$0")" && pwd)/claude-wrapper.sh"
+WRAPPER_DST="${PREFIX}/bin/claude"
+
+if [ -f "$WRAPPER_SRC" ]; then
+    cp "$WRAPPER_SRC" "$WRAPPER_DST"
+    chmod +x "$WRAPPER_DST"
+    ok "wrapper → $WRAPPER_DST"
+else
+    # Fallback: create inline wrapper if source not found
+    cat > "$WRAPPER_DST" << 'WRAPPER_EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+CLAUDE_BINARY="/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude"
+case "$1" in
+  --update|-u|update)
+    echo "🔄 Updating Claude Code..."
+    npm install -g @anthropic-ai/claude-code@latest @anthropic-ai/claude-code-linux-arm64@latest
+    ;;
+  *)
+    exec grun "$CLAUDE_BINARY" "$@"
+    ;;
+esac
+WRAPPER_EOF
+    chmod +x "$WRAPPER_DST"
+    ok "wrapper (inline) → $WRAPPER_DST"
+fi
+
+# Add to shell rc - remove old alias first
 for rc in "$BASHRC" "$ZSHRC"; do
     [[ -f "$rc" ]] || touch "$rc"
+    # Remove old alias if exists
+    sed -i "/^alias claude=/d" "$rc" 2>/dev/null || true
     grep -q "$MARK" "$rc" && sed -i "/$MARK/,/^$/d" "$rc"
-    printf '\n%s\n%s\n%s\n' "$MARK" "$TMPDIR_LINE" "$ALIAS_LINE" >> "$rc"
+    printf '\n%s\n%s\n' "$MARK" "$TMPDIR_LINE" >> "$rc"
 done
 
-ok "alias 'claude' → ~/.bashrc & ~/.zshrc"
+ok "PATH updated → ~/.bashrc & ~/.zshrc"
 
 # apply ke session ini
 export TMPDIR="${PREFIX}/tmp"
-# shellcheck disable=SC2139
-alias claude="grun ${CLAUDE_BIN}"
+export PATH="${PREFIX}/bin:$PATH"
 
 # ── smoke test ────────────────────────────────────────────────
 sep "Smoke test"
