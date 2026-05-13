@@ -8,14 +8,21 @@ Automatic installer that handles all setup: deps, binary, platform patch, glibc-
 
 ## Install
 
-**Shell version (default):**
+**Shell version (recommended):**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
 ```
 
-**Rust version (alternative):**
+**Rust version (pre-built binary):**
 ```bash
-# Build dari PC:
+# Download dari Releases: https://github.com/DamnSit/claude-code-termux/releases
+# Copy ke Termux:
+adb push claude-termux /data/data/com.termux/files/usr/bin/claude
+chmod +x /data/data/com.termux/files/usr/bin/claude
+```
+
+**Rust version (build from source):**
+```bash
 # 1. Clone repo
 # 2. cd rust-wrapper
 # 3. cargo build --release --target aarch64-unknown-linux-gnu
@@ -136,6 +143,22 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 | Device | Android | Arch | Node | Status |
 |---|---|---|---|---|
 | ARM64 | 16 | aarch64 | LTS | ✅ |
+
+---
+
+---
+
+## Shell vs Rust Version
+
+| Feature | Shell | Rust |
+|---------|-------|------|
+| Install | `curl -fsSL ... \| bash` | Download release |
+| Dependencies | bash, curl | None (static binary) |
+| Customize | Easy (edit script) | Rebuild required |
+| Error handling | Basic | Robust (Result type) |
+| Size | ~200 lines | ~1.1 MB |
+
+**Recommended:** Shell version for most users. Rust version for those who prefer a single static binary.
 
 ---
 
