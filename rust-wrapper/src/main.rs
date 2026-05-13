@@ -7,6 +7,7 @@ use std::{
 };
 
 const CLAUDE_BINARY: &str = "/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude";
+const CLAUDE_NODE: &str = "/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/run.js";
 const INSTALLER_URL: &str = "https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh";
 
 #[derive(Parser)]
@@ -26,6 +27,8 @@ enum Commands {
     Uninstall,
     /// Show version
     Version,
+    /// Install dependencies
+    Install,
     /// Show this help
     Help,
 }
@@ -37,6 +40,7 @@ fn main() -> Result<()> {
         Some(Commands::Update) => update()?,
         Some(Commands::Uninstall) => uninstall()?,
         Some(Commands::Version) => version()?,
+        Some(Commands::Install) => install()?,
         Some(Commands::Help) => help()?,
         None => run_claude()?,
     }
@@ -44,35 +48,122 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_claude() -> Result<()> {
-    let claude_path = PathBuf::from(CLAUDE_BINARY);
-    if !claude_path.exists() {
-        anyhow::bail!("Claude binary not found. Run installer first:\n  curl -fsSL {} | bash", INSTALLER_URL);
+fn check_deps() -> bool {
+    // Check if grun exists
+    if Command::new("which").arg("grun").output().map(|o| o.status.success()).unwrap_or(false) {
+        // Check if claude binary exists
+        if PathBuf::from(CLAUDE_BINARY).exists() {
+            return true;
+        }
+    }
+    false
+}
+
+fn install_deps() -> Result<()> {
+    println!("{}", "Installing dependencies...".yellow());
+
+    // Check if nodejs installed
+    if !PathBuf::from("/data/data/com.termux/files/usr/bin/node").exists() {
+        println!("  {} Installing nodejs...", "▸".yellow());
+        Command::new("pkg")
+            .args(["install", "-y", "nodejs-lts"])
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()?;
     }
 
-    // Get all arguments except the program name
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // Check if grun installed
+    if !PathBuf::from("/data/data/com.termux/files/usr/bin/grun").exists() {
+        println!("  {} Installing grun (glibc-runner)...", "▸".yellow());
+        Command::new("pkg")
+            .args(["install", "-y", "grun"])
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()?;
+    }
 
-    // Execute grun with claude binary
-    let status = Command::new("grun")
-        .arg(CLAUDE_BINARY)
-        .args(&args)
-        .stdin(Stdio::inherit())
+    // Install npm packages
+    println!("  {} Installing Claude Code packages...", "▸".yellow());
+    Command::new("npm")
+        .args(["install", "-g", "@anthropic-ai/claude-code", "@anthropic-ai/claude-code-linux-arm64"])
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()?;
 
+    println!("{}", "✓ Dependencies installed!".green());
+    Ok(())
+}
+
+fn run_claude() -> Result<()> {
+    // Check if dependencies are installed
+    if !check_deps() {
+        println!("{}", "Dependencies not found. Installing...".yellow());
+        install_deps()?;
+        println!();
+    }
+
+    // Check if claude binary exists
+    let claude_path = PathBuf::from(CLAUDE_BINARY);
+    let node_path = PathBuf::from(CLAUDE_NODE);
+
+    let (cmd, args) = if node_path.exists() {
+        // Use node for JS layer
+        ("node".to_string(), vec![CLAUDE_NODE.to_string()])
+    } else if claude_path.exists() {
+        // Use native binary with grun
+        ("grun".to_string(), vec![CLAUDE_BINARY.to_string()])
+    } else {
+        println!("{}", "Claude not installed. Installing...".yellow());
+        install_deps()?;
+
+        // Retry check
+        if !check_deps() {
+            anyhow::bail!("Installation failed. Try running:\n  curl -fsSL {} | bash", INSTALLER_URL);
+        }
+
+        // Try again
+        if node_path.exists() {
+            ("node".to_string(), vec![CLAUDE_NODE.to_string()])
+        } else if claude_path.exists() {
+            ("grun".to_string(), vec![CLAUDE_BINARY.to_string()])
+        } else {
+            anyhow::bail!("Claude binary not found after installation.");
+        }
+    };
+
+    // Get all arguments except the program name
+    let user_args: Vec<String> = std::env::args().skip(1).collect();
+
+    // Execute
+    let mut cmd_obj = Command::new(&cmd);
+    cmd_obj.args(&args).args(&user_args)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+
+    let status = cmd_obj.status()?;
     std::process::exit(status.code().unwrap_or(1));
 }
 
 fn version() -> Result<()> {
-    let output = Command::new("grun")
-        .arg(CLAUDE_BINARY)
-        .arg("--version")
-        .output()?;
+    let node_path = PathBuf::from(CLAUDE_NODE);
+    let claude_path = PathBuf::from(CLAUDE_BINARY);
 
-    print!("{}", String::from_utf8_lossy(&output.stdout));
-    std::process::exit(output.status.code().unwrap_or(0));
+    if node_path.exists() {
+        let output = Command::new("node")
+            .args([CLAUDE_NODE, "--version"])
+            .output()?;
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+    } else if claude_path.exists() {
+        let output = Command::new("grun")
+            .arg(CLAUDE_BINARY)
+            .arg("--version")
+            .output()?;
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+    } else {
+        println!("Claude Code not installed. Run 'claude install' first.");
+    }
+    Ok(())
 }
 
 fn help() -> Result<()> {
@@ -87,7 +178,8 @@ fn help() -> Result<()> {
 
 Claude Code - Usage:
 
-  claude              Start Claude Code
+  claude              Start Claude Code (auto-install if needed)
+  claude install      Install dependencies
   claude update       Update to latest version
   claude uninstall   Uninstall Claude Code
   claude version     Show version
@@ -95,6 +187,10 @@ Claude Code - Usage:
 "#
     );
     Ok(())
+}
+
+fn install() -> Result<()> {
+    install_deps()
 }
 
 fn update() -> Result<()> {
@@ -110,64 +206,22 @@ fn update() -> Result<()> {
   ██║     ██║   ██║█████╗  ██╔████╔██║██║
   ██║     ██║   ██║██╔══╝  ██║╚██╔╝██║██║
   ╚██████╗╚██████╔╝███████╗██║ ╚═╝ ██║██║
-   ╚═════╝ ╚═════╝ ╚══════╝╚═╝     ╚═╚═╝"#
+   ╚═════╝ ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝"#
             .cyan()
     );
 
     println!("    {}  {} Termux Native", "Claude Code Updater".bold(), "•".dim());
     println!();
 
-    // Check current version
-    println!("{} Checking current version...", "▸".yellow());
-    let current = get_current_version();
-    println!("  └─ {}: {}", "Current".dim(), current.as_str().green());
-    println!();
-
-    // Check latest version
-    println!("{} Fetching latest version info...", "▸".yellow());
-    let latest = get_latest_version()?;
-    println!("  └─ {}: {}", "Latest".dim(), latest.clone().green());
-    println!();
-
-    // Compare
-    if current == latest {
-        println!(
-            "{} {}",
-            "▓▒░".green(),
-            "You're already on the latest version!".bold()
-        );
-        println!();
-        println!("    {}", current.dim());
-        return Ok(println!());
-    }
-
-    // Update
-    println!("{} {}", "▸".yellow(), "Initiating update sequence...".bold());
-    println!();
-
-    // Progress bar
-    print!("  ┌─────────────────────────────────────┐");
-    print!("\r  │ ");
-    for _ in 0..35 {
-        print!("{}", "█".green());
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-    println!(" │");
-    println!("  └─────────────────────────────────────┘");
-    println!();
-
-    // Run npm update
-    println!("{} Downloading packages...", "▸".yellow());
-    let output = Command::new("npm")
+    // Update npm packages
+    println!("{} Updating packages...", "▸".yellow());
+    Command::new("npm")
         .args(["install", "-g", "@anthropic-ai/claude-code@latest", "@anthropic-ai/claude-code-linux-arm64@latest"])
-        .output()?;
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()?;
 
     println!("  └─ {} Packages updated", "✓".green());
-    println!();
-
-    // Verify
-    println!("{} Verifying installation...", "▸".yellow());
-    let new_ver = get_current_version();
     println!();
 
     // Success
@@ -188,9 +242,6 @@ fn update() -> Result<()> {
     );
 
     println!("  {} {}", "Update Complete!".bold().white(), "\n");
-    println!("  {}: {}", "Previous".dim(), current.dim());
-    println!("  {}: {}", "Current".green(), new_ver.green().bold());
-    println!();
     println!("  {} Type 'claude' to start coding", "claude".cyan());
     println!();
 
@@ -200,42 +251,12 @@ fn update() -> Result<()> {
 fn uninstall() -> Result<()> {
     println!("{} Uninstalling Claude Code Termux...", "▸".yellow());
 
-    let output = Command::new("curl")
-        .args(["-fsSL", &format!("{}/uninstall.sh", INSTALLER_URL)])
+    // Remove npm packages
+    Command::new("npm")
+        .args(["uninstall", "-g", "@anthropic-ai/claude-code", "@anthropic-ai/claude-code-linux-arm64"])
         .output()?;
 
-    if output.status.success() {
-        // Write to temp file and execute
-        let temp_path = "/data/data/com.termux/files/tmp/uninstall.sh";
-        std::fs::write(temp_path, &output.stdout)?;
-        Command::new("bash")
-            .arg(temp_path)
-            .status()?;
-    }
-
+    println!("  └─ {} Packages removed", "✓".green());
+    println!("{}", "Uninstall complete!".green());
     Ok(())
-}
-
-fn get_current_version() -> String {
-    let output = Command::new("grun")
-        .arg(CLAUDE_BINARY)
-        .arg("--version")
-        .output();
-
-    match output {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
-        _ => "unknown".to_string(),
-    }
-}
-
-fn get_latest_version() -> Result<String> {
-    let output = Command::new("npm")
-        .args(["view", "@anthropic-ai/claude-code", "version"])
-        .output()?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        Ok("unknown".to_string())
-    }
 }
