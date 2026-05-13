@@ -53,7 +53,7 @@ CLAUDE_BINARY="/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/cl
 INSTALLER_URL="https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh"
 
 case "$1" in
-  --update|-u|update)
+  --update|-update|update)
     clear
     # ASCII Art Header
     echo -e "${CYN}"
@@ -137,6 +137,13 @@ EOF
     echo ""
     ;;
 
+  --uninstall|-uninstall|uninstall)
+    echo -e "${YEL}▸${NC} Uninstalling Claude Code Termux..."
+    UNINSTALL_URL="https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/uninstall.sh"
+    curl -fsSL "$UNINSTALL_URL" | bash
+    exit $?
+    ;;
+
   --version|-v)
     exec grun "$CLAUDE_BINARY" --version
     ;;
@@ -155,11 +162,13 @@ EOF
     echo -e "${BLD}Claude Code - Usage:${NC}"
     echo ""
     echo -e "  ${GRN}claude${NC}              Start Claude Code"
-    echo -e "  ${GRN}claude -u${NC}           Update ke versi terbaru"
-    echo -e "  ${GRN}claude --update${NC}     Update ke versi terbaru"
-    echo -e "  ${GRN}claude -v${NC}          Show version"
+    echo -e "  ${GRN}claude -update${NC}      Update to latest version"
+    echo -e "  ${GRN}claude --update${NC}     Update to latest version"
+    echo -e "  ${GRN}claude -uninstall${NC}   Uninstall Claude Code"
+    echo -e "  ${GRN}claude --uninstall${NC}  Uninstall Claude Code"
+    echo -e "  ${GRN}claude -v${NC}           Show version"
     echo -e "  ${GRN}claude --version${NC}    Show version"
-    echo -e "  ${GRN}claude --help${NC}       Show this help"
+    echo -e "  ${GRN}claude -h${NC}           Show this help"
     echo ""
     ;;
 

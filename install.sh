@@ -248,10 +248,15 @@ else
     cat > "$WRAPPER_DST" << 'WRAPPER_EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 CLAUDE_BINARY="/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude"
+UNINSTALL_URL="https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/uninstall.sh"
 case "$1" in
-  --update|-u|update)
+  --update|-update|update)
     echo "🔄 Updating Claude Code..."
     npm install -g @anthropic-ai/claude-code@latest @anthropic-ai/claude-code-linux-arm64@latest
+    ;;
+  --uninstall|-uninstall|uninstall)
+    echo "🗑️ Uninstalling Claude Code..."
+    curl -fsSL "$UNINSTALL_URL" | bash
     ;;
   *)
     exec grun "$CLAUDE_BINARY" "$@"
