@@ -53,8 +53,8 @@ printf "\n  ${BLD}Claude Code Termux${NC}  —  Native ARM64 + glibc-runner\n"
 printf "  ${DIM}No Ubuntu. No proot-distro. Full native binary.${NC}\n\n"
 
 # ── guard ─────────────────────────────────────────────────────
-[[ "$(uname -m)" == "aarch64" ]] || die "Hanya support ARM64 (aarch64)"
-[[ -d "$PREFIX" ]]               || die "Termux PREFIX tidak ditemukan"
+[[ "$(uname -m)" == "aarch64" ]] || die "Only supports ARM64 (aarch64)"
+[[ -d "$PREFIX" ]]               || die "Termux PREFIX not found"
 
 # ── step 1: update ────────────────────────────────────────────
 sep "1/7  Update packages"
@@ -75,7 +75,7 @@ sep "3/7  Install @anthropic-ai/claude-code"
 log "npm install (latest)..."
 npm install -g @anthropic-ai/claude-code --force \
     2>&1 | grep -vE '^npm (warn|notice)' || true
-[[ -d "$CC_DIR" ]] || die "claude-code install gagal"
+[[ -d "$CC_DIR" ]] || die "claude-code install failed"
 ok "installed → $CC_DIR"
 
 # ── step 4: linux arm64 binary ────────────────────────────────
@@ -83,7 +83,7 @@ sep "4/7  Install native Linux ARM64 binary"
 log "npm install @anthropic-ai/claude-code-linux-arm64..."
 npm install -g @anthropic-ai/claude-code-linux-arm64 --force \
     2>&1 | grep -vE '^npm (warn|notice)' || true
-[[ -f "$CLAUDE_BIN" ]] || die "linux-arm64 binary tidak ditemukan di $CLAUDE_BIN"
+[[ -f "$CLAUDE_BIN" ]] || die "linux-arm64 binary not found at $CLAUDE_BIN"
 chmod +x "$CLAUDE_BIN"
 ok "binary → $CLAUDE_BIN"
 
@@ -95,24 +95,23 @@ patch_file() {
     local label="$2"
 
     if [[ ! -f "$file" ]]; then
-        warn "$label tidak ditemukan, skip"
+        warn "$label not found, skip"
         return
     fi
 
-    # Cek apakah sudah di-patch
+    # Check if already patched
     if grep -q "process.platform === 'android'" "$file" 2>/dev/null; then
-        ok "$label sudah di-patch sebelumnya"
+        ok "$label already patched"
         return
     fi
 
     # Backup
     cp "$file" "${file}.bak"
 
-    # Patch: ganti `process.platform` ke ternary android→linux
-    # Pakai temp file (lebih aman dari in-place sed di Termux)
+    # Patch: change `process.platform` to android→linux ternary
     local tmp="${file}.tmp"
 
-    # Cari baris `const platform = process.platform` dan ganti
+    # Find `const platform = process.platform` and replace
     awk '
     /const platform = process\.platform[^=]/ {
         print "const platform ="
@@ -124,11 +123,11 @@ patch_file() {
     { print }
     ' "$file" > "$tmp" && mv "$tmp" "$file"
 
-    # Verify patch masuk
+    # Verify patch applied
     if grep -q "android" "$file"; then
         ok "patched: $label"
     else
-        warn "$label patch mungkin tidak masuk — cek manual"
+        warn "$label patch may not have applied — check manually"
         cp "${file}.bak" "$file"
     fi
 }
@@ -140,24 +139,24 @@ patch_file "${CC_DIR}/install.cjs"     "install.cjs"
 sep "6/7  glibc-runner"
 
 if command -v grun &>/dev/null; then
-    ok "glibc-runner sudah terinstall: $(grun --version 2>/dev/null || echo 'ok')"
+    ok "glibc-runner already installed: $(grun --version 2>/dev/null || echo 'ok')"
 else
     log "install glibc-repo..."
     pkg install -y -q glibc-repo 2>/dev/null || pkg install -y glibc-repo
     pkg update -y -q 2>/dev/null || true
     log "install glibc-runner..."
     pkg install -y -q glibc-runner 2>/dev/null || pkg install -y glibc-runner
-    command -v grun &>/dev/null || die "grun tidak ditemukan setelah install"
+    command -v grun &>/dev/null || die "grun not found after install"
     ok "glibc-runner ready"
 fi
 
-# verify binary jalan via grun
+# verify binary runs via grun
 log "verify native binary..."
 VER=$(grun "$CLAUDE_BIN" --version 2>/dev/null | head -1 || true)
 if [[ -n "$VER" ]]; then
     ok "binary OK → $VER"
 else
-    warn "binary test gagal — tapi lanjut (mungkin perlu API key)"
+    warn "binary test failed — but continuing (may need API key)"
 fi
 
 # ── step 7: api key + config ──────────────────────────────────
@@ -167,8 +166,8 @@ sep "7/7  API Key & Config"
 FINAL_KEY="${ANTHROPIC_API_KEY:-}"
 
 if [[ -n "$FINAL_KEY" ]]; then
-    printf "\n  ${GRN}Key dari env:${NC} %s...\n" "${FINAL_KEY:0:28}"
-    printf "  Pakai ini? [Y/n]: "
+    printf "\n  ${GRN}Key from env:${NC} %s...\n" "${FINAL_KEY:0:28}"
+    printf "  Use this? [Y/n]: "
     read -r ans
     [[ "${ans}" == "n" || "${ans}" == "N" ]] && FINAL_KEY=""
 fi
@@ -179,30 +178,30 @@ if [[ -z "$FINAL_KEY" ]]; then
     while true; do
         printf "  Key (Enter = skip): "
         read -rs raw; echo
-        if   [[ -z "$raw" ]];           then warn "dilewati — set manual nanti"; break
+        if   [[ -z "$raw" ]];           then warn "skipped — set manually later"; break
         elif [[ "$raw" == sk-ant-* ]];  then FINAL_KEY="$raw"; ok "key ok"; break
-        else warn "harus diawali sk-ant-  coba lagi"
+        else warn "must start with sk-ant-  try again"
         fi
     done
 fi
 
-# ── base url (opsional, untuk custom endpoint) ────────────────
-printf "\n  ${BLD}Base URL${NC} ${DIM}(kosongkan untuk default Anthropic)${NC}\n"
-printf "  ${DIM}contoh: https://opencode.ai/zen${NC}\n\n"
+# ── base url (optional, for custom endpoint) ──────────────────
+printf "\n  ${BLD}Base URL${NC} ${DIM}(leave empty for default Anthropic)${NC}\n"
+printf "  ${DIM}example: https://opencode.ai/zen${NC}\n\n"
 printf "  Base URL (Enter = skip): "
 read -r BASE_URL
 
 # ── model ─────────────────────────────────────────────────────
-printf "\n  ${BLD}Pilih model${NC}\n\n"
+printf "\n  ${BLD}Select model${NC}\n\n"
 printf "  ${GRN}1)${NC} claude-sonnet-4-5         ${DIM}← recommended${NC}\n"
-printf "  2) claude-opus-4-5           ${DIM}paling pintar${NC}\n"
-printf "  3) claude-haiku-4-5          ${DIM}paling cepat${NC}\n"
+printf "  2) claude-opus-4-5           ${DIM}most intelligent${NC}\n"
+printf "  3) claude-haiku-4-5          ${DIM}fastest${NC}\n"
 printf "  4) claude-sonnet-4-0\n"
 printf "  5) claude-opus-4-0\n"
 printf "  6) claude-3-7-sonnet-20250219\n"
 printf "  7) claude-3-5-haiku-20241022\n"
 printf "  8) custom\n\n"
-printf "  Pilihan [1]: "
+printf "  Choice [1]: "
 read -r choice
 [[ -z "$choice" ]] && choice="1"
 
@@ -214,12 +213,12 @@ case "$choice" in
     5) MODEL="claude-opus-4-0" ;;
     6) MODEL="claude-3-7-sonnet-20250219" ;;
     7) MODEL="claude-3-5-haiku-20241022" ;;
-    8) printf "  Nama model: "; read -r MODEL; [[ -z "$MODEL" ]] && MODEL="claude-sonnet-4-5" ;;
-    *) warn "invalid, pakai default"; MODEL="claude-sonnet-4-5" ;;
+    8) printf "  Model name: "; read -r MODEL; [[ -z "$MODEL" ]] && MODEL="claude-sonnet-4-5" ;;
+    *) warn "invalid, using default"; MODEL="claude-sonnet-4-5" ;;
 esac
 ok "model: $MODEL"
 
-# ── tulis settings.json ───────────────────────────────────────
+# ── write settings.json ───────────────────────────────────────
 mkdir -p "$CFG_DIR"
 
 # build env block pure bash
@@ -274,7 +273,7 @@ done
 
 ok "PATH updated → ~/.bashrc & ~/.zshrc"
 
-# apply ke session ini
+# apply to current session
 export TMPDIR="${PREFIX}/tmp"
 export PATH="${PREFIX}/bin:$PATH"
 
@@ -283,22 +282,29 @@ sep "Smoke test"
 if grun "$CLAUDE_BIN" --version 2>/dev/null | grep -qE "[0-9]+\.[0-9]+"; then
     ok "$(grun "$CLAUDE_BIN" --version 2>/dev/null | head -1)"
 else
-    warn "smoke test gagal — coba manual: grun $CLAUDE_BIN --version"
+    warn "smoke test failed — try manually: grun $CLAUDE_BIN --version"
 fi
 
 # ── done ──────────────────────────────────────────────────────
 printf "\n${GRN}${BLD}"
 printf "  ╔══════════════════════════════════════════════╗\n"
-printf "  ║   ✅  Claude Code Termux siap digunakan!    ║\n"
+printf "  ║   ✅  Claude Code Termux ready to use!       ║\n"
 printf "  ╚══════════════════════════════════════════════╝\n"
 printf "${NC}\n"
 
 [[ -n "$FINAL_KEY" ]] \
     && printf "  ${BLD}Key  :${NC} %s...%s\n" "${FINAL_KEY:0:28}" "${FINAL_KEY: -4}" \
-    || printf "  ${YLW}Key  : belum di-set — export ANTHROPIC_API_KEY=...${NC}\n"
+    || printf "  ${YLW}Key  : not set — export ANTHROPIC_API_KEY=...${NC}\n"
 [[ -n "$BASE_URL" ]] \
     && printf "  ${BLD}URL  :${NC} %s\n" "$BASE_URL"
 printf "  ${BLD}Model:${NC} %s\n\n" "$MODEL"
-printf "  ${DIM}source ~/.bashrc${NC}    ← load alias ke session ini\n"
-printf "  ${CYN}claude${NC}              ← jalankan\n\n"
-printf "  ${DIM}Jika ada masalah: bash install.sh lagi, atau cek TROUBLESHOOTING.md${NC}\n\n"
+
+# Auto-source ~/.bashrc for this session
+log "sourcing ~/.bashrc..."
+source ~/.bashrc 2>/dev/null || true
+source ~/.zshrc 2>/dev/null || true
+ok "~/.bashrc & ~/.zshrc loaded"
+
+printf "  ${CYN}claude${NC}              ← run\n\n"
+printf "  ${DIM}Tip: run with 'source install.sh' to activate PATH immediately${NC}\n"
+printf "  ${DIM}If issues: run bash install.sh again, or check TROUBLESHOOTING.md${NC}\n\n"

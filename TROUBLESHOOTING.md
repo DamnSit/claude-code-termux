@@ -6,7 +6,7 @@
 source ~/.bashrc
 ```
 
-Kalau masih gagal:
+If it still fails:
 ```bash
 alias claude="grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude"
 ```
@@ -23,14 +23,14 @@ pkg install glibc-runner -y
 
 ---
 
-## `claude --version` keluar error / crash
+## `claude --version` exits with error / crash
 
-Verify binary langsung:
+Verify binary directly:
 ```bash
 grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude --version
 ```
 
-Kalau masih crash, re-run installer:
+If it still crashes, re-run installer:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
 ```
@@ -39,12 +39,12 @@ curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/ins
 
 ## API key error / unauthorized
 
-Cek `~/.claude/settings.json`:
+Check `~/.claude/settings.json`:
 ```bash
 cat ~/.claude/settings.json
 ```
 
-Edit kalau perlu:
+Edit if needed:
 ```bash
 nano ~/.claude/settings.json
 ```
@@ -53,15 +53,15 @@ nano ~/.claude/settings.json
 
 ## Platform detection error
 
-Patch mungkin tidak masuk. Re-run installer otomatis patch ulang. Atau manual:
+Patch may not have applied. Re-run installer to automatically re-patch. Or manually:
 
 ```bash
 nano /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/cli-wrapper.cjs
 ```
 
-Cari: `const platform = process.platform`
+Find: `const platform = process.platform`
 
-Ganti dengan:
+Replace with:
 ```js
 const platform =
   process.platform === 'android'
@@ -69,16 +69,16 @@ const platform =
     : process.platform
 ```
 
-Lakukan hal yang sama di `install.cjs`.
+Do the same in `install.cjs`.
 
 ---
 
-## Setelah `pkg upgrade`, claude rusak
+## After `pkg upgrade`, claude breaks
 
-Upgrade bisa overwrite node_modules. Re-run installer.
+Upgrade can overwrite node_modules. Re-run installer.
 
 ---
 
-## Lambat / hang saat pertama launch
+## Slow / hang on first launch
 
-Normal — glibc-runner perlu init pertama kali. Tunggu ~5 detik.
+Normal — glibc-runner needs first-time init. Wait ~5 seconds.

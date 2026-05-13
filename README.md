@@ -1,8 +1,8 @@
 # Claude Code Termux
 
-**Claude Code native di Android ARM64 — tanpa Ubuntu, tanpa proot-distro.**
+**Claude Code native on Android ARM64 — no Ubuntu, no proot-distro.**
 
-Installer otomatis yang handle semua setup: deps, binary, platform patch, glibc-runner, API key, dan model selection — satu command selesai.
+Automatic installer that handles all setup: deps, binary, platform patch, glibc-runner, API key, and model selection — one command done.
 
 ---
 
@@ -12,7 +12,7 @@ Installer otomatis yang handle semua setup: deps, binary, platform patch, glibc-
 curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
 ```
 
-Setelah install:
+After install:
 
 ```bash
 source ~/.bashrc
@@ -24,43 +24,43 @@ claude
 ## Requirements
 
 - Android ARM64 (aarch64)
-- [Termux dari F-Droid](https://f-droid.org/en/packages/com.termux/) — bukan Play Store
+- [Termux from F-Droid](https://f-droid.org/en/packages/com.termux/) — not Play Store
 - Internet
 - Anthropic API key → [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
 
 ---
 
-## Cara kerja
+## How it works
 
 ```
 claude (alias)
-  └── grun                          ← glibc-runner (jalanin glibc binary di Bionic)
+  └── grun                          ← glibc-runner (run glibc binary on Bionic)
         └── claude-code-linux-arm64 ← official Anthropic native binary
 ```
 
-**Kenapa ini beda dari setup lain:**
+**Why this is different from other setups:**
 
-| Setup lain | Repo ini |
+| Other setups | This repo |
 |---|---|
-| Pin ke versi lama (v2.1.112) | Latest version |
+| Pinned to old version (v2.1.112) | Latest version |
 | JS via `node cli.js` | Native ARM64 binary |
-| proot-distro Ubuntu | `glibc-runner` langsung |
-| Lambat startup | Native performance |
+| proot-distro Ubuntu | `glibc-runner` directly |
+| Slow startup | Native performance |
 
 ---
 
-## Yang di-install
+## What's installed
 
-| Package | Fungsi |
+| Package | Purpose |
 |---|---|
 | `nodejs-lts` | Runtime + npm |
-| `glibc-runner` | Jalanin binary glibc di Android Bionic |
+| `glibc-runner` | Run glibc binary on Android Bionic |
 | `@anthropic-ai/claude-code` | Claude Code (JS layer) |
 | `@anthropic-ai/claude-code-linux-arm64` | Native ARM64 binary |
 
-**Patch otomatis:**
-- `cli-wrapper.cjs` — deteksi platform `android` → `linux`
-- `install.cjs` — sama
+**Auto-patched:**
+- `cli-wrapper.cjs` — platform detection `android` → `linux`
+- `install.cjs` — same
 
 **Config:**
 - `~/.claude/settings.json` — API key, model, base URL
@@ -70,13 +70,13 @@ claude (alias)
 
 ## Custom endpoint
 
-Installer akan nanya base URL saat setup. Contoh untuk pakai provider lain:
+Installer will ask for base URL during setup. Example for using other providers:
 
 ```
 Base URL: https://opencode.ai/zen
 ```
 
-Atau edit langsung `~/.claude/settings.json`:
+Or edit directly `~/.claude/settings.json`:
 
 ```json
 {
@@ -93,13 +93,13 @@ Atau edit langsung `~/.claude/settings.json`:
 
 ## Update
 
-Ada dua cara:
+Two ways:
 
 ```bash
-# Cara 1: CLI (rekomendasi)
+# Method 1: CLI (recommended)
 claude -u
 
-# Cara 2: Re-run installer
+# Method 2: Re-run installer
 curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
 ```
 
@@ -115,7 +115,7 @@ curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/uni
 
 ## Troubleshooting
 
-Lihat [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ---
 
