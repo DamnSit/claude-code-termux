@@ -6,27 +6,58 @@ Automatic installer that handles all setup: deps, binary, platform patch, glibc-
 
 ---
 
-## Install
+## Install - Shell Version (Recommended)
 
-**Shell version (recommended):**
+**Cukup satu perintah:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
 ```
 
-**Rust version (pre-built binary):**
+Installer akan meminta:
+1. API key Anthropic
+2. Model (sonnet/haiku)
+3. Optional: custom base URL
+
+**Setelah install:**
 ```bash
-# Download dari Releases: https://github.com/DamnSit/claude-code-termux/releases
-# Copy ke Termux:
-adb push claude-termux /data/data/com.termux/files/usr/bin/claude
-chmod +x /data/data/com.termux/files/usr/bin/claude
+source ~/.bashrc
+claude
 ```
 
-**Rust version (build from source):**
+---
+
+## Install - Rust Version
+
+**Option 1: Pre-built Binary (Tidak perlu PC)**
+```bash
+# Download dari:
+# https://github.com/DamnSit/claude-code-termux/releases
+
+# Copy ke Termux via ADB:
+adb push claude-termux /data/data/com.termux/files/usr/bin/claude
+adb shell chmod +x /data/data/com.termux/files/usr/bin/claude
+```
+
+**Option 2: Build dari Source (Perlu PC)**
 ```bash
 # 1. Clone repo
-# 2. cd rust-wrapper
-# 3. cargo build --release --target aarch64-unknown-linux-gnu
-# 4. Copy binary ke Termux: /data/data/com.termux/files/usr/bin/claude
+git clone https://github.com/DamnSit/claude-code-termux
+cd claude-code-termux/rust-wrapper
+
+# 2. Build (butuh Rust toolchain + gcc-aarch64-linux-gnu)
+cargo build --release --target aarch64-unknown-linux-gnu
+
+# 3. Copy ke Termux
+adb push target/aarch64-unknown-linux-gnu/release/claude-termux \
+  /data/data/com.termux/files/usr/bin/claude
+adb shell chmod +x /data/data/com.termux/files/usr/bin/claude
+```
+
+**Setelah install Rust version,还需要安装:**
+```bash
+# Install dependencies
+pkg install nodejs-lts grun
+npm install -g @anthropic-ai/claude-code @anthropic-ai/claude-code-linux-arm64
 ```
 
 Lihat [rust-wrapper/BUILD.md](rust-wrapper/BUILD.md) untuk detail build.
@@ -68,7 +99,7 @@ claude (alias)
 
 ---
 
-## What's installed
+## What's installed (Shell version)
 
 | Package | Purpose |
 |---|---|
@@ -84,6 +115,12 @@ claude (alias)
 **Config:**
 - `~/.claude/settings.json` — API key, model, base URL
 - `~/.bashrc` + `~/.zshrc` — alias `claude`
+
+**Rust version perlu install manual:**
+```bash
+pkg install nodejs-lts grun
+npm install -g @anthropic-ai/claude-code @anthropic-ai/claude-code-linux-arm64
+```
 
 ---
 
@@ -112,22 +149,28 @@ Or edit directly `~/.claude/settings.json`:
 
 ## Update
 
-Two ways:
-
+**Shell version:**
 ```bash
-# Method 1: CLI (recommended)
 claude -u
-
-# Method 2: Re-run installer
+# atau
 curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
 ```
+
+**Rust version:**
+Perlu rebuild dari source atau download binary baru dari release.
 
 ---
 
 ## Uninstall
 
+**Shell version:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/uninstall.sh | bash
+```
+
+**Rust version:**
+```bash
+rm /data/data/com.termux/files/usr/bin/claude
 ```
 
 ---
@@ -152,13 +195,15 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 | Feature | Shell | Rust |
 |---------|-------|------|
-| Install | `curl -fsSL ... \| bash` | Download release |
-| Dependencies | bash, curl | None (static binary) |
-| Customize | Easy (edit script) | Rebuild required |
-| Error handling | Basic | Robust (Result type) |
-| Size | ~200 lines | ~1.1 MB |
+| Cara Install | `curl -fsSL ... \| bash` | Download release / build sendiri |
+| Binary Claude | Sudah termasuk | Perlu `npm install` manual |
+| Update | `claude -u` | Rebuild / download ulang |
+| Customize | Edit langsung script | Edit code + rebuild |
+| Ukuran | ~200 baris | ~1.1 MB |
 
-**Recommended:** Shell version for most users. Rust version for those who prefer a single static binary.
+**Pilih yang mana?**
+- **Shell** - Lebih mudah, tinggal jalankan installer
+- **Rust** - Lebih performant, tapi butuh setup manual
 
 ---
 
