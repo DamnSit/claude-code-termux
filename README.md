@@ -28,33 +28,24 @@ claude
 
 ## Install - Rust Version
 
-**1. Download binary dari:**
-https://github.com/DamnSit/claude-code-termux/releases
-
-**2. Copy ke Termux:**
+**1 baris di Termux:**
 ```bash
-# Via ADB
-adb push claude-termux $PREFIX/bin/claude
-# ATAU copy manual dari file manager
-
-chmod +x $PREFIX/bin/claude
+curl -fsSL https://github.com/DamnSit/claude-code-termux/releases/latest/download/claude-termux -o $PREFIX/bin/claude && chmod +x $PREFIX/bin/claude
 ```
 
-**3. Jalankan!**
+**Jalankan:**
 ```bash
 claude
 ```
 
 Binary akan auto-install dependencies kalau belum ada!
 
-**Build sendiri (optional):**
+**Build sendiri:**
 ```bash
 git clone https://github.com/DamnSit/claude-code-termux
 cd claude-code-termux/rust-wrapper
 cargo build --release --target aarch64-unknown-linux-gnu
 ```
-
-Lihat [rust-wrapper/BUILD.md](rust-wrapper/BUILD.md) untuk detail build.
 
 After install:
 
