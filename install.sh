@@ -314,37 +314,55 @@ ok "~/.claude/settings.json (permissions: 600)"
 MARK="# claude-code-termux"
 TMPDIR_LINE="export TMPDIR=\"\${TMPDIR:-${PREFIX}/tmp}\""
 
-# Copy wrapper script to bin
-WRAPPER_SRC="$(cd "$(dirname "$0")" && pwd)/claude-wrapper.sh"
+# Create wrapper directly
 WRAPPER_DST="${PREFIX}/bin/claude"
 
-if [ -f "$WRAPPER_SRC" ]; then
-    cp "$WRAPPER_SRC" "$WRAPPER_DST"
-    chmod +x "$WRAPPER_DST"
-    ok "wrapper → $WRAPPER_DST"
-else
-    # Fallback: create inline wrapper if source not found
-    cat > "$WRAPPER_DST" << 'WRAPPER_EOF'
+cat > "$WRAPPER_DST" << 'WRAPPER_EOF'
 #!/data/data/com.termux/files/usr/bin/bash
+# Claude Code Termux Wrapper
+
 CLAUDE_BINARY="/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude"
-UNINSTALL_URL="https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/uninstall.sh"
+
+# Check if grun exists
+if ! command -v grun &>/dev/null; then
+    echo "Error: grun not found. Install: pkg install grun"
+    exit 1
+fi
+
+# Check if binary exists
+if [[ ! -f "$CLAUDE_BINARY" ]]; then
+    echo "Error: binary not found. Re-run install script."
+    exit 1
+fi
+
 case "$1" in
+  --version|-v)
+    exec grun "$CLAUDE_BINARY" --version
+    ;;
   --update|-update|update)
-    echo "🔄 Updating Claude Code..."
-    npm install -g @anthropic-ai/claude-code@latest @anthropic-ai/claude-code-linux-arm64@latest
+    echo "🔄 Updating..."
+    # Download latest binary directly
+    mkdir -p "$(dirname "$CLAUDE_BINARY")"
+    VERSION=$(npm view @anthropic-ai/claude-code-linux-arm64 version 2>/dev/null)
+    curl -fSL "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-${VERSION}.tgz" -o /tmp/claude.tgz 2>/dev/null && \
+    tar -xzf /tmp/claude.tgz -C "$(dirname "$CLAUDE_BINARY")" 2>/dev/null && \
+    mv "$(dirname "$CLAUDE_BINARY")/package/bin/claude" "$CLAUDE_BINARY" 2>/dev/null && \
+    rm -rf "$(dirname "$CLAUDE_BINARY")/package" /tmp/claude.tgz
+    echo "✓ Done"
     ;;
   --uninstall|-uninstall|uninstall)
-    echo "🗑️ Uninstalling Claude Code..."
-    curl -fsSL "$UNINSTALL_URL" | bash
+    curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/uninstall.sh | bash
+    ;;
+  --help|-h|"")
+    echo "Usage: claude [--version|--update|--uninstall|--help] [args...]"
     ;;
   *)
     exec grun "$CLAUDE_BINARY" "$@"
     ;;
 esac
 WRAPPER_EOF
-    chmod +x "$WRAPPER_DST"
-    ok "wrapper (inline) → $WRAPPER_DST"
-fi
+chmod +x "$WRAPPER_DST"
+ok "wrapper → $WRAPPER_DST"
 
 # Add to shell rc - remove old alias first
 for rc in "$BASHRC" "$ZSHRC"; do
