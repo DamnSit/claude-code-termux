@@ -6,7 +6,7 @@
 #  curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
 # ─────────────────────────────────────────────────────────────
 
-set -uo pipefail
+set -euo pipefail
 
 # ── colors ────────────────────────────────────────────────────
 BLD='\033[1m'
@@ -73,7 +73,7 @@ ok "deps ok — node $(node -v)  npm $(npm -v)"
 # ── step 3: claude code ───────────────────────────────────────
 sep "3/7  Install @anthropic-ai/claude-code"
 log "npm install (latest)..."
-npm install -g @anthropic-ai/claude-code --force \
+npm install -g @anthropic-ai/claude-code \
     2>&1 | grep -vE '^npm (warn|notice)' || true
 [[ -d "$CC_DIR" ]] || die "claude-code install failed"
 ok "installed → $CC_DIR"
@@ -81,7 +81,7 @@ ok "installed → $CC_DIR"
 # ── step 4: linux arm64 binary ────────────────────────────────
 sep "4/7  Install native Linux ARM64 binary"
 log "npm install @anthropic-ai/claude-code-linux-arm64..."
-npm install -g @anthropic-ai/claude-code-linux-arm64 --force \
+npm install -g @anthropic-ai/claude-code-linux-arm64 \
     2>&1 | grep -vE '^npm (warn|notice)' || true
 [[ -f "$CLAUDE_BIN" ]] || die "linux-arm64 binary not found at $CLAUDE_BIN"
 chmod +x "$CLAUDE_BIN"
@@ -134,6 +134,10 @@ patch_file() {
 
 patch_file "${CC_DIR}/cli-wrapper.cjs" "cli-wrapper.cjs"
 patch_file "${CC_DIR}/install.cjs"     "install.cjs"
+
+# Cleanup backup files
+rm -f "${CC_DIR}/cli-wrapper.cjs.bak" "${CC_DIR}/install.cjs.bak"
+ok "cleanup: .bak files removed"
 
 # ── step 6: glibc-runner ─────────────────────────────────────
 sep "6/7  glibc-runner"
@@ -221,15 +225,28 @@ ok "model: $MODEL"
 # ── write settings.json ───────────────────────────────────────
 mkdir -p "$CFG_DIR"
 
-# build env block pure bash
-ENV_BLOCK="    \"ANTHROPIC_MODEL\": \"${MODEL}\""
-[[ -n "$FINAL_KEY" ]] && ENV_BLOCK="${ENV_BLOCK},\n    \"ANTHROPIC_API_KEY\": \"${FINAL_KEY}\""
-[[ -n "$BASE_URL"  ]] && ENV_BLOCK="${ENV_BLOCK},\n    \"ANTHROPIC_BASE_URL\": \"${BASE_URL}\""
+# Build JSON using jq to prevent injection
+# Escape special characters in user input
+MODEL_ESCAPED=$(printf '%s' "$MODEL" | jq -Rs .)
+KEY_ESCAPED=$(printf '%s' "$FINAL_KEY" | jq -Rs .)
+URL_ESCAPED=$(printf '%s' "$BASE_URL" | jq -Rs .)
 
-printf '{\n  "env": {\n%b\n  },\n  "autoUpdatesChannel": "latest"\n}\n' \
-    "$ENV_BLOCK" > "$CFG"
+jq -n \
+    --arg model "$MODEL_ESCAPED" \
+    --arg key "$KEY_ESCAPED" \
+    --arg url "$URL_ESCAPED" \
+    '{
+      env: {
+        ANTHROPIC_MODEL: ($model | if . == "" then null else . end),
+        ANTHROPIC_API_KEY: ($key | if . == "" then null else . end),
+        ANTHROPIC_BASE_URL: ($url | if . == "" then null else . end)
+      },
+      autoUpdatesChannel: "latest"
+    }' > "$CFG"
 
-ok "~/.claude/settings.json"
+# Secure the settings file (API key protection)
+chmod 600 "$CFG"
+ok "~/.claude/settings.json (permissions: 600)"
 
 # ── wrapper ────────────────────────────────────────────────────
 MARK="# claude-code-termux"

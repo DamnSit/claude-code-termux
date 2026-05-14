@@ -16,8 +16,4 @@ done
 
 echo -e "\n  ${YLW}Config ~/.claude/ left intact${NC}"
 
-# Reload shell config
-source ~/.bashrc 2>/dev/null || true
-source ~/.zshrc 2>/dev/null || true
-
 echo -e "\nDone.\n"
