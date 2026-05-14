@@ -20,21 +20,11 @@ if ! command -v grun &>/dev/null; then
     pkg install -y grun 2>/dev/null || \
     pkg install -y glibc-runner 2>/dev/null || \
     pkg install -y termux-api 2>/dev/null || true
-
-    # If grun still not found, try to install from npm
-    if ! command -v grun &>/dev/null; then
-        echo "⚠️ grun not found in repos, trying alternative..."
-        # Maybe use node directly as fallback
-    fi
 fi
 
-# Check if grun exists now
-if ! command -v grun &>/dev/null; then
-    echo ""
-    echo "⚠️ WARNING: glibc-runner (grun) not installed."
-    echo "   Some features may not work."
-    echo "   Try: pkg install glibc"
-fi
+# Create temp dir in PREFIX (writable)
+TEMP_DIR="/data/data/com.termux/files/usr/tmp"
+mkdir -p "$TEMP_DIR"
 
 # Install Claude Code JS layer
 echo "📥 Downloading Claude Code..."
@@ -47,25 +37,17 @@ mkdir -p "$ARM_DIR"
 VERSION=$(npm view @anthropic-ai/claude-code-linux-arm64 version 2>/dev/null || echo "2.1.141")
 echo "   Version: $VERSION"
 
-# Try curl first, then wget
-TARBALL="/tmp/claude.tgz"
+# Use PREFIX temp dir
+TARBALL="${TEMP_DIR}/claude.tgz"
 echo "   Downloading..."
-if curl -fSL "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-${VERSION}.tgz" -o "$TARBALL" 2>&1; then
+
+if curl -fSL "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-${VERSION}.tgz" -o "$TARBALL"; then
     echo "   Extracting..."
     tar -xzf "$TARBALL" -C "$ARM_DIR"
-    if [[ -f "$ARM_DIR/package/claude" ]]; then
-        mv "$ARM_DIR/package/claude" "$ARM_DIR/claude"
-        rm -rf "$ARM_DIR/package"
-    fi
-    rm -f "$TARBALL"
+    [[ -f "$ARM_DIR/package/claude" ]] && mv "$ARM_DIR/package/claude" "$ARM_DIR/claude"
+    rm -rf "$ARM_DIR/package" "$TARBALL"
     echo "   ✓ Binary installed"
 else
-    echo "   ⚠️ Download failed, trying with wget..."
-    wget -q "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-${VERSION}.tgz" -O "$TARBALL" 2>&1 && \
-    tar -xzf "$TARBALL" -C "$ARM_DIR" && \
-    [[ -f "$ARM_DIR/package/claude" ]] && mv "$ARM_DIR/package/claude" "$ARM_DIR/claude" && \
-    rm -rf "$ARM_DIR/package" "$TARBALL" && \
-    echo "   ✓ Binary installed via wget" || \
     echo "   ⚠️ Download failed"
 fi
 
