@@ -51,20 +51,19 @@ else
     echo "   ⚠️ Download failed"
 fi
 
-# CRITICAL: Create wrapper that uses grun OR node
+# CRITICAL: Create wrapper
 echo "🔧 Creating wrapper..."
-if command -v grun &>/dev/null; then
-    WRAPPER_CMD="exec grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude \"\$@\""
-else
-    # Use node as fallback - run JS wrapper
-    WRAPPER_CMD="exec node /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/run.js \"\$@\""
-fi
+WRAPPER_FILE="/data/data/com.termux/files/usr/bin/claude"
+rm -f "$WRAPPER_FILE"
 
-cat > /data/data/com.termux/files/usr/bin/claude << WRAPPER
-#!/bin/bash
-$WRAPPER_CMD
-WRAPPER
-chmod +x /data/data/com.termux/files/usr/bin/claude
+# Write wrapper using printf (more reliable than heredoc)
+if command -v grun &>/dev/null; then
+    printf '%s\n' '#!/bin/bash' 'exec grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude "$@"' > "$WRAPPER_FILE"
+else
+    printf '%s\n' '#!/bin/bash' 'exec node /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/run.js "$@"' > "$WRAPPER_FILE"
+fi
+chmod +x "$WRAPPER_FILE"
+echo "   ✓ Wrapper created"
 
 # Backup npm wrapper to prevent overwrite
 if [[ -f "/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" ]]; then
