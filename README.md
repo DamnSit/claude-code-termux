@@ -171,6 +171,42 @@ chmod +x $PREFIX/bin/claude
 
 ---
 
+## Security Audit
+
+This binary is open source. You can verify what it does before running.
+
+### What it does:
+- `pkg install nodejs-lts grun` - install required packages
+- `npm install -g @anthropic-ai/claude-code` - install Claude Code JS layer
+- `curl` download native binary from npm registry
+- `grun` or `node` - run Claude Code
+- `npm uninstall` - remove packages on uninstall
+
+### What it does NOT do:
+- Write to arbitrary filesystem locations
+- Modify your settings
+- Execute arbitrary code
+- Connect to anything except npm registry
+
+### How to verify:
+```bash
+# 1. View source code
+curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/rust-wrapper/src/main.rs
+
+# 2. Download and verify binary
+curl -fsSL https://github.com/DamnSit/claude-code-termux/releases/latest/download/claude-termux -o /tmp/claude-termux
+file /tmp/claude-termux  # Should be ELF for ARM64
+strings /tmp/claude-termux | head -100  # See embedded strings
+
+# 3. Build from source (advanced)
+# Requires Rust cross-compiler for aarch64
+git clone https://github.com/DamnSit/claude-code-termux
+cd claude-code-termux/rust-wrapper
+cargo build --release --target aarch64-unknown-linux-musl
+```
+
+---
+
 ## Need Help?
 
 - Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
