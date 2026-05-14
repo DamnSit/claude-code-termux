@@ -82,13 +82,37 @@ fn install_deps() -> Result<()> {
             .status()?;
     }
 
-    // Install npm packages with --force untuk skip platform check
-    println!("  {} Installing Claude Code packages...", "▸".yellow());
-    Command::new("npm")
-        .args(["install", "-g", "--force", "@anthropic-ai/claude-code", "@anthropic-ai/claude-code-linux-arm64"])
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()?;
+    // Install just JS layer (skip native binary - download directly instead)
+    println!("  {} Installing Claude Code (JS layer)...", "▸".yellow());
+    let _ = Command::new("npm")
+        .args(["install", "-g", "@anthropic-ai/claude-code"])
+        .output();
+
+    // Download native binary directly (bypassing npm platform check)
+    println!("  {} Downloading native binary directly...", "▸".yellow());
+    let npm_home = std::env::var("npm_config_prefix")
+        .unwrap_or_else(|_| "/data/data/com.termux/files/usr".to_string());
+    let binary_dir = format!("{}/lib/node_modules/@anthropic-ai/claude-code-linux-arm64", npm_home);
+
+    // Create directory
+    let _ = Command::new("mkdir")
+        .args(["-p", &binary_dir])
+        .output();
+
+    // Download tarball and extract
+    let tarball = format!("{}/claude-linux-arm64.tar.gz", binary_dir);
+    let download = Command::new("curl")
+        .args(["-L", "-o", &tarball, "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.141.tgz"])
+        .output();
+
+    if download.is_ok() && PathBuf::from(&tarball).exists() {
+        // Extract
+        let _ = Command::new("tar")
+            .args(["-xzf", &tarball, "-C", &binary_dir])
+            .output();
+        // Cleanup
+        let _ = std::fs::remove_file(&tarball);
+    }
 
     println!("{}", "✓ Dependencies installed!".green());
     Ok(())
@@ -221,18 +245,40 @@ fn update() -> Result<()> {
     println!("{} Updating packages...", "▸".yellow());
     println!("  └─ {} Settings preserved", "✓".green());
 
+    // Update JS layer
     if xurxuo_installed {
-        Command::new("npm")
-            .args(["install", "-g", "@xurxuo/claude-code-termux@latest", "@anthropic-ai/claude-code-linux-arm64@latest"])
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status()?;
+        let _ = Command::new("npm")
+            .args(["install", "-g", "@xurxuo/claude-code-termux@latest"])
+            .output();
     } else if anthropic_installed {
-        Command::new("npm")
-            .args(["install", "-g", "@anthropic-ai/claude-code@latest", "@anthropic-ai/claude-code-linux-arm64@latest"])
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status()?;
+        let _ = Command::new("npm")
+            .args(["install", "-g", "@anthropic-ai/claude-code@latest"])
+            .output();
+    }
+
+    // Download native binary directly (bypassing npm platform check)
+    println!("  {} Updating native binary...", "▸".yellow());
+    let npm_home = std::env::var("npm_config_prefix")
+        .unwrap_or_else(|_| "/data/data/com.termux/files/usr".to_string());
+    let binary_dir = format!("{}/lib/node_modules/@anthropic-ai/claude-code-linux-arm64", npm_home);
+    let tarball = format!("{}/claude-linux-arm64.tar.gz", binary_dir);
+
+    // Get latest version
+    let version_output = Command::new("npm")
+        .args(["view", "@anthropic-ai/claude-code-linux-arm64", "version"])
+        .output()?;
+    let version = String::from_utf8_lossy(&version_output.stdout).trim().to_string();
+
+    let download = Command::new("curl")
+        .args(["-L", "-o", &tarball, &format!("https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-{}.tgz", version)])
+        .output();
+
+    if download.is_ok() && PathBuf::from(&tarball).exists() {
+        let _ = Command::new("tar")
+            .args(["-xzf", &tarball, "-C", &binary_dir])
+            .output();
+        let _ = std::fs::remove_file(&tarball);
+        println!("  └─ {} Native binary updated", "✓".green());
     }
 
     println!("  └─ {} Packages updated", "✓".green());
