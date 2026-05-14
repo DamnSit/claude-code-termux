@@ -89,7 +89,7 @@ fn install_deps() -> Result<()> {
         .output();
 
     // Download native binary directly (bypassing npm platform check)
-    println!("  {} Downloading native binary directly...", "▸".yellow());
+    println!("  {} Downloading native binary...", "▸".yellow());
     let npm_home = std::env::var("npm_config_prefix")
         .unwrap_or_else(|_| "/data/data/com.termux/files/usr".to_string());
     let binary_dir = format!("{}/lib/node_modules/@anthropic-ai/claude-code-linux-arm64", npm_home);
@@ -99,19 +99,38 @@ fn install_deps() -> Result<()> {
         .args(["-p", &binary_dir])
         .output();
 
-    // Download tarball and extract
-    let tarball = format!("{}/claude-linux-arm64.tar.gz", binary_dir);
+    // Get latest version
+    let version_output = Command::new("npm")
+        .args(["view", "@anthropic-ai/claude-code-linux-arm64", "version"])
+        .output()?;
+    let version = String::from_utf8_lossy(&version_output.stdout).trim().to_string();
+
+    // Download tarball from npm
+    let tarball = format!("{}/package.tgz", binary_dir);
     let download = Command::new("curl")
-        .args(["-L", "-o", &tarball, "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.141.tgz"])
+        .args(["-L", "-o", &tarball, &format!("https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-{}.tgz", version)])
         .output();
 
     if download.is_ok() && PathBuf::from(&tarball).exists() {
-        // Extract
+        // Extract tarball
         let _ = Command::new("tar")
             .args(["-xzf", &tarball, "-C", &binary_dir])
             .output();
+        // Move binary to correct location
+        let package_dir = format!("{}/package", binary_dir);
+        if PathBuf::from(&package_dir).exists() {
+            let _ = Command::new("mv")
+                .args(["-f", &format!("{}/bin/claude", package_dir), &format!("{}/claude", binary_dir)])
+                .output();
+        }
         // Cleanup
         let _ = std::fs::remove_file(&tarball);
+    }
+
+    // Verify binary exists
+    let claude_binary = format!("{}/claude", binary_dir);
+    if !PathBuf::from(&claude_binary).exists() {
+        println!("  {} Warning: claude binary not found", "⚠".yellow());
     }
 
     println!("{}", "✓ Dependencies installed!".green());
