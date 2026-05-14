@@ -298,24 +298,21 @@ ok "model: $MODEL"
 # ── write settings.json ───────────────────────────────────────
 mkdir -p "$CFG_DIR"
 
-# Build JSON using jq to prevent injection
-# Escape special characters in user input
-MODEL_ESCAPED=$(printf '%s' "$MODEL" | jq -Rs .)
-KEY_ESCAPED=$(printf '%s' "$FINAL_KEY" | jq -Rs .)
-URL_ESCAPED=$(printf '%s' "$BASE_URL" | jq -Rs .)
+# Build JSON using pure bash (no jq dependency)
+# Escape special characters for JSON
+escape_json() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g; s/\r/\\r/g; s/\n/\\n/g'
+}
 
-jq -n \
-    --arg model "$MODEL_ESCAPED" \
-    --arg key "$KEY_ESCAPED" \
-    --arg url "$URL_ESCAPED" \
-    '{
-      env: {
-        ANTHROPIC_MODEL: ($model | if . == "" then null else . end),
-        ANTHROPIC_API_KEY: ($key | if . == "" then null else . end),
-        ANTHROPIC_BASE_URL: ($url | if . == "" then null else . end)
-      },
-      autoUpdatesChannel: "latest"
-    }' > "$CFG"
+MODEL_JSON="\"ANTHROPIC_MODEL\": \"$(escape_json "$MODEL")\""
+[[ -n "$FINAL_KEY" ]] && KEY_JSON="\"ANTHROPIC_API_KEY\": \"$(escape_json "$FINAL_KEY")\""
+[[ -n "$BASE_URL" ]] && URL_JSON="\"ANTHROPIC_BASE_URL\": \"$(escape_json "$BASE_URL")\""
+
+ENV_BLOCK="$MODEL_JSON"
+[[ -n "$KEY_JSON" ]] && ENV_BLOCK="$ENV_BLOCK, $KEY_JSON"
+[[ -n "$URL_JSON" ]] && ENV_BLOCK="$ENV_BLOCK, $URL_JSON"
+
+printf '{\n  "env": {\n    %s\n  },\n  "autoUpdatesChannel": "latest"\n}\n' "$ENV_BLOCK" > "$CFG"
 
 # Secure the settings file (API key protection)
 chmod 600 "$CFG"
