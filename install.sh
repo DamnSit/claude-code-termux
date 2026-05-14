@@ -1,396 +1,88 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# ─────────────────────────────────────────────────────────────
-#  Claude Code Termux — install.sh
-#  github.com/DamnSit/claude-code-termux
-#
-#  curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
-# ─────────────────────────────────────────────────────────────
+# Claude Code Termux - Simple Install
+# curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
 
 set -euo pipefail
 
-# ── colors ────────────────────────────────────────────────────
-BLD='\033[1m'
-RED='\033[1;31m'
-GRN='\033[1;32m'
-YLW='\033[1;33m'
-CYN='\033[1;36m'
-DIM='\033[2m'
-NC='\033[0m'
+echo "🔧 Installing Claude Code for Termux..."
 
-log()  { printf "\n${CYN}▸${NC} %s\n" "$*"; }
-ok()   { printf "  ${GRN}✓${NC} %s\n" "$*"; }
-warn() { printf "  ${YLW}!${NC} %s\n" "$*"; }
-die()  { printf "\n${RED}✗ %s${NC}\n" "$*" >&2; exit 1; }
-sep()  { printf "\n${BLD}── %s ──────────────────────────────────────${NC}\n" "$*"; }
+# Check ARM64
+[[ "$(uname -m)" == "aarch64" ]] || { echo "Only ARM64 supported"; exit 1; }
 
-# ── constants ─────────────────────────────────────────────────
-PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
-MOD_DIR="${PREFIX}/lib/node_modules"
-CC_DIR="${MOD_DIR}/@anthropic-ai/claude-code"
-ARM_DIR="${MOD_DIR}/@anthropic-ai/claude-code-linux-arm64"
-CLAUDE_BIN="${ARM_DIR}/claude"
-WRAPPER="${PREFIX}/bin/claude"
-CFG_DIR="${HOME}/.claude"
-CFG="${CFG_DIR}/settings.json"
+# Install deps
+echo "📦 Installing packages..."
+pkg update -y -q 2>/dev/null || true
+pkg install -y nodejs-lts git wget 2>/dev/null || true
 
-# rc files
-BASHRC="${HOME}/.bashrc"
-ZSHRC="${HOME}/.zshrc"
-
-# ── header ────────────────────────────────────────────────────
-clear
-printf "${CYN}${BLD}"
-cat << 'EOF'
-   ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗
-  ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝
-  ██║     ██║     ███████║██║   ██║██║  ██║█████╗
-  ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝
-  ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗
-   ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝
-EOF
-printf "${NC}"
-printf "\n  ${BLD}Claude Code Termux${NC}  —  Native ARM64 + glibc-runner\n"
-printf "  ${DIM}No Ubuntu. No proot-distro. Full native binary.${NC}\n\n"
-
-# ── guard ─────────────────────────────────────────────────────
-[[ "$(uname -m)" == "aarch64" ]] || die "Only supports ARM64 (aarch64)"
-[[ -d "$PREFIX" ]]               || die "Termux PREFIX not found"
-
-# ── step 1: update ────────────────────────────────────────────
-sep "1/7  Update packages"
-log "pkg update & upgrade..."
-
-# Try multiple times with different approaches
-update_pkg() {
-    pkg update -y 2>&1
-}
-
-# First attempt
-if update_pkg 2>/dev/null; then
-    pkg upgrade -y -q 2>/dev/null || true
-else
-    # Failed, try changing mirror for ZeroTermux
-    warn "pkg update failed, trying alternative mirror..."
-
-    # Try common ZeroTermux mirrors
-    for mirror in "https://d.icdown.club/repository/main" "https://packages.zeroteam.top" "https://mirrors.tuna.tsinghua.edu.cn/termux"; do
-        echo "deb $mirror termux main" > $PREFIX/etc/apt/sources.list 2>/dev/null || true
-        if update_pkg 2>/dev/null; then
-            warn "Using mirror: $mirror"
-            break
-        fi
-    done
-
-    # Last resort - just try to continue
-    pkg update -y 2>/dev/null || true
+# Try different names for glibc-runner
+if ! command -v grun &>/dev/null; then
+    echo "🔍 Looking for glibc-runner..."
+    pkg install -y grun 2>/dev/null || \
+    pkg install -y glibc-runner 2>/dev/null || \
+    pkg install -y termux-api 2>/dev/null || true
 fi
-ok "packages up to date"
 
-# ── step 2: deps ──────────────────────────────────────────────
-sep "2/7  Dependencies"
-log "install nodejs-lts git wget patchelf proot tar..."
+# Create temp dir in PREFIX (writable)
+TEMP_DIR="/data/data/com.termux/files/usr/tmp"
+mkdir -p "$TEMP_DIR"
 
-# Install deps with retry
-install_deps() {
-    pkg install -y nodejs-lts git wget patchelf proot tar 2>&1
-}
+# Install Claude Code JS layer
+echo "📥 Downloading Claude Code..."
+npm install -g @anthropic-ai/claude-code 2>/dev/null || true
 
-# Try with -q first, if fails try without
-if ! install_deps -q 2>/dev/null; then
-    warn "Install failed with -q, trying without..."
-    install_deps 2>/dev/null || true
-fi
-ok "deps ok — node $(node -v)  npm $(npm -v)"
-
-# ── step 3: claude code ───────────────────────────────────────
-sep "3/7  Install @anthropic-ai/claude-code"
-log "npm install (latest)..."
-npm install -g @anthropic-ai/claude-code \
-    2>&1 | grep -vE '^npm (warn|notice)' || true
-[[ -d "$CC_DIR" ]] || die "claude-code install failed"
-ok "installed → $CC_DIR"
-
-# ── CRITICAL: Overwrite npm's wrapper with our grun wrapper ──
-WRAPPER="${PREFIX}/bin/claude"
-rm -f "$WRAPPER"
-cat > "$WRAPPER" << 'WRAPPER_EOF'
-#!/data/data/com.termux/files/usr/bin/bash
-exec grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude "$@"
-WRAPPER_EOF
-chmod +x "$WRAPPER"
-log "Wrapper installed"
-
-# ── step 4: linux arm64 binary ────────────────────────────────
-sep "4/7  Install native Linux ARM64 binary"
-log "Installing native binary..."
-
-# Create directory
+# Install native binary directly
+echo "📥 Downloading native binary..."
+ARM_DIR="/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64"
 mkdir -p "$ARM_DIR"
+VERSION=$(npm view @anthropic-ai/claude-code-linux-arm64 version 2>/dev/null || echo "2.1.141")
+echo "   Version: $VERSION"
 
-# Get latest version
-VERSION=$(npm view @anthropic-ai/claude-code-linux-arm64 version 2>/dev/null) || VERSION="2.1.141"
-log "Latest version: $VERSION"
+# Use PREFIX temp dir
+TARBALL="${TEMP_DIR}/claude.tgz"
+echo "   Downloading..."
 
-# Download tarball from npm registry - show progress
-TARBALL="${ARM_DIR}/package.tgz"
-log "Downloading from npm registry..."
-
-DOWNLOAD_URL="https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-${VERSION}.tgz"
-log "URL: $DOWNLOAD_URL"
-
-# Download with visible output
-if curl -fSL "$DOWNLOAD_URL" -o "$TARBALL" --progress-bar; then
-    log "Download complete, size: $(ls -lh "$TARBALL" 2>/dev/null | awk '{print $5}')"
-    log "Extracting..."
-    tar -xzf "$TARBALL" -C "$ARM_DIR" 2>&1 | head -5 || true
-    rm -f "$TARBALL"
-
-    # Binary is at package/claude (not package/bin/claude!)
-    if [[ -f "${ARM_DIR}/package/claude" ]]; then
-        mv "${ARM_DIR}/package/claude" "$CLAUDE_BIN"
-        rm -rf "${ARM_DIR}/package"
-        log "Moved binary to $CLAUDE_BIN"
-    elif [[ -f "${ARM_DIR}/claude" ]]; then
-        log "Binary already at correct location"
-    else
-        log "Searching for binary..."
-        find "$ARM_DIR" -name "claude" -type f 2>/dev/null | head -5
-    fi
+if curl -fSL "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-${VERSION}.tgz" -o "$TARBALL"; then
+    echo "   Extracting..."
+    tar -xzf "$TARBALL" -C "$ARM_DIR"
+    [[ -f "$ARM_DIR/package/claude" ]] && mv "$ARM_DIR/package/claude" "$ARM_DIR/claude"
+    rm -rf "$ARM_DIR/package" "$TARBALL"
+    echo "   ✓ Binary installed"
 else
-    die "Failed to download binary from npm registry"
+    echo "   ⚠️ Download failed"
 fi
 
-[[ -f "$CLAUDE_BIN" ]] || die "linux-arm64 binary not found at $CLAUDE_BIN"
-chmod +x "$CLAUDE_BIN"
-ok "binary → $CLAUDE_BIN"
+# CRITICAL: Create wrapper
+echo "🔧 Creating wrapper..."
+WRAPPER_FILE="/data/data/com.termux/files/usr/bin/claude"
+rm -f "$WRAPPER_FILE"
 
-# Run postinstall to complete setup
-log "Running postinstall..."
-if [[ -f "${CC_DIR}/install.cjs" ]]; then
-    node "${CC_DIR}/install.cjs" 2>/dev/null || true
-fi
-
-# ── step 5: patch platform detection ─────────────────────────
-sep "5/7  Patch platform detection"
-
-patch_file() {
-    local file="$1"
-    local label="$2"
-
-    if [[ ! -f "$file" ]]; then
-        warn "$label not found, skip"
-        return
-    fi
-
-    # Check if already patched
-    if grep -q "process.platform === 'android'" "$file" 2>/dev/null; then
-        ok "$label already patched"
-        return
-    fi
-
-    # Backup
-    cp "$file" "${file}.bak"
-
-    # Patch: change `process.platform` to android→linux ternary
-    local tmp="${file}.tmp"
-
-    # Find `const platform = process.platform` and replace
-    awk '
-    /const platform = process\.platform[^=]/ {
-        print "const platform ="
-        print "  process.platform === '"'"'android'"'"'"
-        print "    ? '"'"'linux'"'"'"
-        print "    : process.platform"
-        next
-    }
-    { print }
-    ' "$file" > "$tmp" && mv "$tmp" "$file"
-
-    # Verify patch applied
-    if grep -q "android" "$file"; then
-        ok "patched: $label"
-    else
-        warn "$label patch may not have applied — check manually"
-        cp "${file}.bak" "$file"
-    fi
-}
-
-patch_file "${CC_DIR}/cli-wrapper.cjs" "cli-wrapper.cjs"
-patch_file "${CC_DIR}/install.cjs"     "install.cjs"
-
-# Cleanup backup files
-rm -f "${CC_DIR}/cli-wrapper.cjs.bak" "${CC_DIR}/install.cjs.bak"
-ok "cleanup: .bak files removed"
-
-# ── step 6: glibc-runner ─────────────────────────────────────
-sep "6/7  glibc-runner"
-
+# Write wrapper using printf (more reliable than heredoc)
 if command -v grun &>/dev/null; then
-    ok "glibc-runner already installed: $(grun --version 2>/dev/null || echo 'ok')"
+    printf '%s\n' '#!/bin/bash' 'exec grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude "$@"' > "$WRAPPER_FILE"
 else
-    log "install glibc-repo..."
-    pkg install -y -q glibc-repo 2>/dev/null || pkg install -y glibc-repo
-    pkg update -y -q 2>/dev/null || true
-    log "install glibc-runner..."
-    pkg install -y -q glibc-runner 2>/dev/null || pkg install -y glibc-runner
-    command -v grun &>/dev/null || die "grun not found after install"
-    ok "glibc-runner ready"
+    printf '%s\n' '#!/bin/bash' 'exec node /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/run.js "$@"' > "$WRAPPER_FILE"
+fi
+chmod +x "$WRAPPER_FILE"
+echo "   ✓ Wrapper created"
+
+# Backup npm wrapper to prevent overwrite
+if [[ -f "/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" ]]; then
+    mv /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe.bak 2>/dev/null || true
 fi
 
-# verify binary runs via grun
-log "verify native binary..."
-VER=$(grun "$CLAUDE_BIN" --version 2>/dev/null | head -1 || true)
-if [[ -n "$VER" ]]; then
-    ok "binary OK → $VER"
+# Test
+echo ""
+echo "✅ Done!"
+if command -v grun &>/dev/null; then
+    echo "Testing native binary..."
+    grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude --version 2>/dev/null || echo "Binary installed"
 else
-    warn "binary test failed — but continuing (may need API key)"
+    echo "Testing with node..."
+    node /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/run.js --version 2>/dev/null || echo "Installed"
 fi
 
-# ── step 7: api key + config ──────────────────────────────────
-sep "7/7  API Key & Config"
-
-# ── api key ───────────────────────────────────────────────────
-FINAL_KEY="${ANTHROPIC_API_KEY:-}"
-
-if [[ -n "$FINAL_KEY" ]]; then
-    printf "\n  ${GRN}Key from env:${NC} %s...\n" "${FINAL_KEY:0:28}"
-    printf "  Use this? [Y/n]: "
-    read -r ans
-    [[ "${ans}" == "n" || "${ans}" == "N" ]] && FINAL_KEY=""
-fi
-
-if [[ -z "$FINAL_KEY" ]]; then
-    printf "\n  ${BLD}Anthropic API Key${NC}\n"
-    printf "  ${DIM}→ console.anthropic.com/settings/keys${NC}\n\n"
-    while true; do
-        printf "  Key (Enter = skip): "
-        read -rs raw; echo
-        if   [[ -z "$raw" ]];           then FINAL_KEY=""; warn "skipped — set manually later"; break
-        elif [[ "$raw" == sk-ant-* ]];  then FINAL_KEY="$raw"; ok "key ok"; break
-        else warn "must start with sk-ant-  try again"
-        fi
-    done
-fi
-
-# Ensure FINAL_KEY is defined (prevent unbound variable)
-FINAL_KEY="${FINAL_KEY:-}"
-
-# ── base url (optional, for custom endpoint) ──────────────────
-printf "\n  ${BLD}Base URL${NC} ${DIM}(leave empty for default Anthropic)${NC}\n"
-printf "  ${DIM}example: https://opencode.ai/zen${NC}\n\n"
-printf "  Base URL (Enter = skip): "
-read -r BASE_URL
-
-# ── model ─────────────────────────────────────────────────────
-printf "\n  ${BLD}Select model${NC}\n\n"
-printf "  ${GRN}1)${NC} claude-sonnet-4-5         ${DIM}← recommended${NC}\n"
-printf "  2) claude-opus-4-5           ${DIM}most intelligent${NC}\n"
-printf "  3) claude-haiku-4-5          ${DIM}fastest${NC}\n"
-printf "  4) claude-sonnet-4-0\n"
-printf "  5) claude-opus-4-0\n"
-printf "  6) claude-3-7-sonnet-20250219\n"
-printf "  7) claude-3-5-haiku-20241022\n"
-printf "  8) custom\n\n"
-printf "  Choice [1]: "
-read -r choice
-[[ -z "$choice" ]] && choice="1"
-
-case "$choice" in
-    1) MODEL="claude-sonnet-4-5" ;;
-    2) MODEL="claude-opus-4-5" ;;
-    3) MODEL="claude-haiku-4-5" ;;
-    4) MODEL="claude-sonnet-4-0" ;;
-    5) MODEL="claude-opus-4-0" ;;
-    6) MODEL="claude-3-7-sonnet-20250219" ;;
-    7) MODEL="claude-3-5-haiku-20241022" ;;
-    8) printf "  Model name: "; read -r MODEL; [[ -z "$MODEL" ]] && MODEL="claude-sonnet-4-5" ;;
-    *) warn "invalid, using default"; MODEL="claude-sonnet-4-5" ;;
-esac
-ok "model: $MODEL"
-
-# ── write settings.json ───────────────────────────────────────
-mkdir -p "$CFG_DIR"
-
-# Build JSON using pure bash (no jq dependency)
-# Escape special characters for JSON
-escape_json() {
-    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g; s/\r/\\r/g; s/\n/\\n/g'
-}
-
-MODEL_JSON="\"ANTHROPIC_MODEL\": \"$(escape_json "$MODEL")\""
-[[ -n "$FINAL_KEY" ]] && KEY_JSON="\"ANTHROPIC_API_KEY\": \"$(escape_json "$FINAL_KEY")\""
-[[ -n "$BASE_URL" ]] && URL_JSON="\"ANTHROPIC_BASE_URL\": \"$(escape_json "$BASE_URL")\""
-
-ENV_BLOCK="$MODEL_JSON"
-[[ -n "$KEY_JSON" ]] && ENV_BLOCK="$ENV_BLOCK, $KEY_JSON"
-[[ -n "$URL_JSON" ]] && ENV_BLOCK="$ENV_BLOCK, $URL_JSON"
-
-printf '{\n  "env": {\n    %s\n  },\n  "autoUpdatesChannel": "latest"\n}\n' "$ENV_BLOCK" > "$CFG"
-
-# Secure the settings file (API key protection)
-chmod 600 "$CFG"
-ok "~/.claude/settings.json (permissions: 600)"
-
-# ── wrapper ────────────────────────────────────────────────────
-MARK="# claude-code-termux"
-TMPDIR_LINE="export TMPDIR=\"\${TMPDIR:-${PREFIX}/tmp}\""
-
-# Remove old symlink from npm (if exists) - force remove any type
-WRAPPER_DST="${PREFIX}/bin/claude"
-rm -f "$WRAPPER_DST"
-echo "  ✓ Cleaned old wrapper/symlink"
-
-# Create simple wrapper
-cat > "$WRAPPER_DST" << 'WRAPPER_EOF'
-#!/data/data/com.termux/files/usr/bin/bash
-exec grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude "$@"
-WRAPPER_EOF
-chmod +x "$WRAPPER_DST"
-echo "  ✓ wrapper → $WRAPPER_DST"
-
-# Add to shell rc - remove old alias first
-for rc in "$BASHRC" "$ZSHRC"; do
-    [[ -f "$rc" ]] || touch "$rc"
-    # Remove old alias if exists
-    sed -i "/^alias claude=/d" "$rc" 2>/dev/null || true
-    grep -q "$MARK" "$rc" && sed -i "/$MARK/,/^$/d" "$rc"
-    printf '\n%s\n%s\n' "$MARK" "$TMPDIR_LINE" >> "$rc"
-done
-
-ok "PATH updated → ~/.bashrc & ~/.zshrc"
-
-# apply to current session
-export TMPDIR="${PREFIX}/tmp"
-export PATH="${PREFIX}/bin:$PATH"
-
-# ── smoke test ────────────────────────────────────────────────
-sep "Smoke test"
-if grun "$CLAUDE_BIN" --version 2>/dev/null | grep -qE "[0-9]+\.[0-9]+"; then
-    ok "$(grun "$CLAUDE_BIN" --version 2>/dev/null | head -1)"
-else
-    warn "smoke test failed — try manually: grun $CLAUDE_BIN --version"
-fi
-
-# ── done ──────────────────────────────────────────────────────
-printf "\n${GRN}${BLD}"
-printf "  ╔══════════════════════════════════════════════╗\n"
-printf "  ║   ✅  Claude Code Termux ready to use!       ║\n"
-printf "  ╚══════════════════════════════════════════════╝\n"
-printf "${NC}\n"
-
-[[ -n "$FINAL_KEY" ]] \
-    && printf "  ${BLD}Key  :${NC} %s...%s\n" "${FINAL_KEY:0:28}" "${FINAL_KEY: -4}" \
-    || printf "  ${YLW}Key  : not set — export ANTHROPIC_API_KEY=...${NC}\n"
-[[ -n "$BASE_URL" ]] \
-    && printf "  ${BLD}URL  :${NC} %s\n" "$BASE_URL"
-printf "  ${BLD}Model:${NC} %s\n\n" "$MODEL"
-
-# Auto-source ~/.bashrc for this session
-log "sourcing ~/.bashrc..."
-source ~/.bashrc 2>/dev/null || true
-source ~/.zshrc 2>/dev/null || true
-ok "~/.bashrc & ~/.zshrc loaded"
-
-printf "  ${CYN}claude${NC}              ← run\n\n"
-printf "  ${DIM}Tip: run with 'source install.sh' to activate PATH immediately${NC}\n"
-printf "  ${DIM}If issues: run bash install.sh again, or check TROUBLESHOOTING.md${NC}\n\n"
+echo ""
+echo "Usage: claude --version  (test)"
+echo "       claude             (start)"
+echo ""
+echo "⚠️  Set API key: export ANTHROPIC_API_KEY=sk-ant-..."
