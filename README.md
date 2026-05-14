@@ -92,7 +92,7 @@ done
 |-------|-------|
 | **Key ID** | `63788A3CE203C94C` |
 | **Fingerprint** | `6330DDFEF6C0B831A26699C863788A3CE203C94C` |
-| **Email** | dimarlin65@gmail.com |
+| **Email** | [Private] |
 | **Owner** | DamnSit |
 
 ---
