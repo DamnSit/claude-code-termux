@@ -1,8 +1,6 @@
 #!/bin/bash
 # Secure installer - verifies checksums before running
 
-set -euo pipefail
-
 REPO="DamnSit/claude-code-termux"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/main"
 
@@ -11,19 +9,24 @@ echo ""
 
 # Download checksums file
 echo "  ▸ Downloading checksums..."
-if curl -fSL "${BASE_URL}/CHECKSUMS.txt" -o /tmp/CHECKSUMS.txt; then
+CHECKSUMS_ERR=$(curl -fSL "${BASE_URL}/CHECKSUMS.txt" -o /tmp/CHECKSUMS.txt 2>&1)
+if [[ $? -eq 0 ]]; then
     echo "  ✅ Checksums downloaded"
     CHECKSUMS_OK=1
 else
-    echo "  ⚠ Failed to download checksums (network issue?), skipping verification"
+    echo "  ⚠ Checksums download failed: ${CHECKSUMS_ERR:-unknown error}"
     CHECKSUMS_OK=0
 fi
 
 # Download install script
 echo "  ▸ Downloading installer..."
-if ! curl -fSL "${BASE_URL}/install.sh" -o /tmp/install.sh; then
+INSTALL_ERR=$(curl -fSL "${BASE_URL}/install.sh" -o /tmp/install.sh 2>&1)
+if [[ $? -ne 0 ]]; then
     echo "❌ Failed to download installer."
-    echo "   Try: wget -O- https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash"
+    echo "   Error: ${INSTALL_ERR:-unknown}"
+    echo ""
+    echo "   Try alternative:"
+    echo "   wget -O- https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash"
     exit 1
 fi
 echo "  ✅ Installer downloaded"
