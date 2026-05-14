@@ -1,8 +1,8 @@
 {
   "name": "@xurxuo/claude-code-termux",
-  "version": "2.1.140",
+  "version": "2.1.141",
   "bin": {
-    "claude": "bin/claude.exe"
+    "claude": "cli-wrapper.cjs"
   },
   "scripts": {
     "postinstall": "node install.cjs"
@@ -20,7 +20,7 @@
   },
   "dependencies": {},
   "optionalDependencies": {
-    "@anthropic-ai/claude-code-linux-arm64": "2.1.140"
+    "@anthropic-ai/claude-code-linux-arm64": "latest"
   },
   "files": [
     "bin/claude.exe",

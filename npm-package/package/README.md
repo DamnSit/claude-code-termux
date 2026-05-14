@@ -29,7 +29,13 @@ claude
 ```bash
 claude              # Start Claude Code
 claude --version    # Check version
+claude update       # Force update to latest Claude Code packages
 ```
+
+The wrapper checks npm at most once per day. If
+`@anthropic-ai/claude-code-linux-arm64` has a newer version, it automatically
+installs the latest Claude Code packages before launching. Set
+`CLAUDE_CODE_TERMUX_NO_AUTO_UPDATE=1` to disable the daily check.
 
 ## Auth
 

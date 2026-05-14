@@ -4,11 +4,14 @@
 
 const { spawnSync } = require('child_process')
 const { arch, constants } = require('os')
+const fs = require('fs')
+const os = require('os')
 const path = require('path')
 
 const PACKAGE_PREFIX = '@anthropic-ai/claude-code'
 const BINARY_NAME = 'claude'
 const WRAPPER_NAME = require('./package.json').name
+const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000
 
 const PLATFORMS = {
   'darwin-arm64': { pkg: PACKAGE_PREFIX + '-darwin-arm64', bin: BINARY_NAME },
@@ -73,7 +76,104 @@ function getPlatformKey() {
   return platform + '-' + cpu
 }
 
-function getBinaryPath() {
+function readPackageJson(pkg) {
+  const pkgJsonPath = require.resolve(pkg + '/package.json')
+  return {
+    dir: path.dirname(pkgJsonPath),
+    json: require(pkgJsonPath),
+  }
+}
+
+function compareVersions(a, b) {
+  const left = String(a).split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0)
+  const right = String(b).split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0)
+  const len = Math.max(left.length, right.length)
+  for (let i = 0; i < len; i++) {
+    if ((left[i] || 0) > (right[i] || 0)) return 1
+    if ((left[i] || 0) < (right[i] || 0)) return -1
+  }
+  return 0
+}
+
+function getStateFile() {
+  return path.join(os.homedir(), '.cache', 'claude-code-termux', 'update-check.json')
+}
+
+function shouldCheckForUpdates(force) {
+  if (force) return true
+  if (process.env.CLAUDE_CODE_TERMUX_NO_AUTO_UPDATE === '1') return false
+
+  try {
+    const state = JSON.parse(fs.readFileSync(getStateFile(), 'utf8'))
+    return Date.now() - Number(state.lastChecked || 0) > UPDATE_INTERVAL_MS
+  } catch {
+    return true
+  }
+}
+
+function markUpdateChecked() {
+  const file = getStateFile()
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify({ lastChecked: Date.now() }) + '\n')
+}
+
+function npmViewLatest(pkg) {
+  const command = process.env.npm_execpath ? process.execPath : 'npm'
+  const args = process.env.npm_execpath
+    ? [process.env.npm_execpath, 'view', pkg, 'version', '--silent']
+    : ['view', pkg, 'version', '--silent']
+  const result = spawnSync(command, args, {
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  })
+  if (result.status !== 0) return null
+  return result.stdout.trim()
+}
+
+function npmInstallLatest(packages) {
+  const command = process.env.npm_execpath ? process.execPath : 'npm'
+  const installArgs = ['install', '-g', ...packages.map((pkg) => pkg + '@latest')]
+  const args = process.env.npm_execpath
+    ? [process.env.npm_execpath, ...installArgs]
+    : installArgs
+  const result = spawnSync(
+    command,
+    args,
+    {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    },
+  )
+  return result.status === 0
+}
+
+function refreshNativePackage(info, force = false) {
+  if (!shouldCheckForUpdates(force)) return
+
+  let current = null
+  try {
+    current = readPackageJson(info.pkg).json.version
+  } catch {}
+
+  const latest = npmViewLatest(info.pkg)
+  if (!latest) {
+    if (force) {
+      console.error(`[${WRAPPER_NAME}] Could not fetch latest ${info.pkg} version.`)
+    }
+    return
+  }
+
+  if (!current || compareVersions(latest, current) > 0 || force) {
+    console.error(
+      `[${WRAPPER_NAME}] Updating Claude Code native package ${current || 'missing'} -> ${latest}`,
+    )
+    npmInstallLatest([PACKAGE_PREFIX, info.pkg])
+  }
+
+  markUpdateChecked()
+}
+
+function getBinaryPath(options = {}) {
   const platformKey = getPlatformKey()
   const info = PLATFORMS[platformKey]
   if (!info) {
@@ -82,8 +182,9 @@ function getBinaryPath() {
     )
     process.exit(1)
   }
+  refreshNativePackage(info, options.forceUpdate)
   try {
-    const pkgDir = path.dirname(require.resolve(info.pkg + '/package.json'))
+    const pkgDir = readPackageJson(info.pkg).dir
     return path.join(pkgDir, info.bin)
   } catch {
     console.error(
@@ -95,8 +196,16 @@ function getBinaryPath() {
 }
 
 function main() {
+  const args = process.argv.slice(2)
+  const forceUpdate = args[0] === 'update' || args[0] === '--update' || args[0] === '-update'
+
+  if (forceUpdate) {
+    getBinaryPath({ forceUpdate: true })
+    process.exit(0)
+  }
+
   const binaryPath = getBinaryPath()
-  const result = spawnSync(binaryPath, process.argv.slice(2), {
+  const result = spawnSync(binaryPath, args, {
     stdio: 'inherit',
     env: { ...process.env, CLAUDE_CODE_INSTALLED_VIA_NPM_WRAPPER: '1' },
   })

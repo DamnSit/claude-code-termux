@@ -3,15 +3,6 @@
 // Patches: android -> linux for platform detection
 
 const { spawnSync } = require('child_process')
-const {
-  copyFileSync,
-  linkSync,
-  unlinkSync,
-  chmodSync,
-  readFileSync,
-  writeFileSync,
-  statSync,
-} = require('fs')
 const { arch } = require('os')
 const path = require('path')
 
@@ -82,36 +73,40 @@ function getPlatformKey() {
   return platform + '-' + cpu
 }
 
-function placeBinary(src, dest) {
-  try {
-    linkSync(src, dest)
-  } catch (err) {
-    if (err.code === 'EEXIST') {
-      const stub = statSync(dest).size < 4096 ? readFileSync(dest) : null
-      unlinkSync(dest)
-      try {
-        linkSync(src, dest)
-      } catch {
-        try {
-          copyFileSync(src, dest)
-        } catch (copyErr) {
-          if (stub) {
-            try {
-              writeFileSync(dest, stub, { mode: 0o755 })
-            } catch {}
-          }
-          throw copyErr
-        }
-      }
-    } else if (err.code === 'EXDEV' || err.code === 'EPERM') {
-      copyFileSync(src, dest)
-    } else {
-      throw err
-    }
+function installLatestNativePackage(pkg) {
+  console.error(`[${WRAPPER_NAME} postinstall] Installing ${pkg}@latest...`)
+  const command = process.env.npm_execpath ? process.execPath : 'npm'
+  const args = process.env.npm_execpath
+    ? [process.env.npm_execpath, 'install', '-g', pkg + '@latest']
+    : ['install', '-g', pkg + '@latest']
+  const result = spawnSync(command, args, {
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  })
+  return result.status === 0
+}
+
+function npmViewLatest(pkg) {
+  const command = process.env.npm_execpath ? process.execPath : 'npm'
+  const args = process.env.npm_execpath
+    ? [process.env.npm_execpath, 'view', pkg, 'version', '--silent']
+    : ['view', pkg, 'version', '--silent']
+  const result = spawnSync(command, args, {
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  })
+  return result.status === 0 ? result.stdout.trim() : null
+}
+
+function compareVersions(a, b) {
+  const left = String(a).split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0)
+  const right = String(b).split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0)
+  const len = Math.max(left.length, right.length)
+  for (let i = 0; i < len; i++) {
+    if ((left[i] || 0) > (right[i] || 0)) return 1
+    if ((left[i] || 0) < (right[i] || 0)) return -1
   }
-  if (process.platform !== 'win32') {
-    chmodSync(dest, 0o755)
-  }
+  return 0
 }
 
 function main() {
@@ -126,31 +121,24 @@ function main() {
     return
   }
 
-  let src
   try {
     const pkgDir = path.dirname(require.resolve(info.pkg + '/package.json'))
-    src = path.join(pkgDir, info.bin)
+    const pkgJson = require(path.join(pkgDir, 'package.json'))
+    console.error(
+      `[${WRAPPER_NAME} postinstall] Native package ready: ${info.pkg}@${pkgJson.version}`,
+    )
+    const latest = npmViewLatest(info.pkg)
+    if (latest && compareVersions(latest, pkgJson.version) > 0) {
+      installLatestNativePackage(info.pkg)
+    }
   } catch {
-    console.error(
-      `[${WRAPPER_NAME} postinstall] Native package "${info.pkg}" not found.`,
-    )
-    console.error(
-      '  The `claude` command will print instructions when invoked.',
-    )
-    console.error('  Fallback: node ' + path.join(__dirname, 'cli-wrapper.cjs'))
-    return
-  }
-
-  const dest = path.join(__dirname, 'bin', 'claude.exe')
-
-  try {
-    placeBinary(src, dest)
-  } catch (err) {
-    console.error(
-      `[${WRAPPER_NAME} postinstall] Failed to place binary: ${err.message}`,
-    )
-    console.error('  Fallback: node ' + path.join(__dirname, 'cli-wrapper.cjs'))
-    process.exitCode = 1
+    if (!installLatestNativePackage(info.pkg)) {
+      console.error(
+        `[${WRAPPER_NAME} postinstall] Native package "${info.pkg}" not found and latest install failed.`,
+      )
+      console.error('  Try again with: npm install -g ' + info.pkg + '@latest')
+      process.exitCode = 1
+    }
   }
 }
 
