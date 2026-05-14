@@ -1,6 +1,5 @@
 #!/bin/bash
 # Secure installer - verifies checksums before running
-# Usage: curl -fsSL https://.../install-secure.sh | bash
 
 REPO="DamnSit/claude-code-termux"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/main"
@@ -12,9 +11,12 @@ mkdir -p "$TMPDIR"
 echo "🔐 Verifying installer integrity..."
 echo ""
 
+# Force refresh to avoid CDN cache
+CACHE_BUST="?t=$(date +%s)"
+
 # Download checksums file
 echo "  ▸ Downloading checksums..."
-if curl -fSL "${BASE_URL}/CHECKSUMS.txt" -o "${TMPDIR}/CHECKSUMS.txt" 2>/dev/null; then
+if curl -fSL "${BASE_URL}/CHECKSUMS.txt${CACHE_BUST}" -o "${TMPDIR}/CHECKSUMS.txt" 2>/dev/null; then
     echo "  ✅ Checksums downloaded"
     CHECKSUMS_OK=1
 else
@@ -24,7 +26,7 @@ fi
 
 # Download install script
 echo "  ▸ Downloading installer..."
-if ! curl -fSL "${BASE_URL}/install.sh" -o "${TMPDIR}/install.sh" 2>/dev/null; then
+if ! curl -fSL "${BASE_URL}/install.sh${CACHE_BUST}" -o "${TMPDIR}/install.sh" 2>/dev/null; then
     echo "❌ Failed to download installer."
     echo ""
     echo "   Try alternative:"
