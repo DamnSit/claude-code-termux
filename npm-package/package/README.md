@@ -34,7 +34,9 @@ claude update       # Force update to latest Claude Code packages
 
 The wrapper checks npm at most once per day. If
 `@anthropic-ai/claude-code-linux-arm64` has a newer version, it automatically
-installs the latest Claude Code packages before launching. Set
+installs the latest Claude Code packages before launching. The native package
+uses npm `--force` because Termux reports `os=android` while the official
+binary package is tagged `os=linux`. Set
 `CLAUDE_CODE_TERMUX_NO_AUTO_UPDATE=1` to disable the daily check.
 
 ## Auth

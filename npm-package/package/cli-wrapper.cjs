@@ -132,7 +132,7 @@ function npmViewLatest(pkg) {
 
 function npmInstallLatest(packages) {
   const command = process.env.npm_execpath ? process.execPath : 'npm'
-  const installArgs = ['install', '-g', ...packages.map((pkg) => pkg + '@latest')]
+  const installArgs = ['install', '-g', '--force', ...packages.map((pkg) => pkg + '@latest')]
   const args = process.env.npm_execpath
     ? [process.env.npm_execpath, ...installArgs]
     : installArgs

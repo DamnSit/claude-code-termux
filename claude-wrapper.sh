@@ -103,7 +103,7 @@ EOF
 
     # Run update with spinner
     echo -e "${YEL}▸${NC} Downloading packages..."
-    npm install -g @anthropic-ai/claude-code@latest @anthropic-ai/claude-code-linux-arm64@latest 2>&1 &
+    npm install -g --force @anthropic-ai/claude-code@latest @anthropic-ai/claude-code-linux-arm64@latest 2>&1 &
     spinner $!
     echo -e "${GRN}  └─${NC} ${GRN}✓${NC} Packages updated"
     echo ""

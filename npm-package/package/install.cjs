@@ -77,8 +77,8 @@ function installLatestNativePackage(pkg) {
   console.error(`[${WRAPPER_NAME} postinstall] Installing ${pkg}@latest...`)
   const command = process.env.npm_execpath ? process.execPath : 'npm'
   const args = process.env.npm_execpath
-    ? [process.env.npm_execpath, 'install', '-g', pkg + '@latest']
-    : ['install', '-g', pkg + '@latest']
+    ? [process.env.npm_execpath, 'install', '-g', '--force', pkg + '@latest']
+    : ['install', '-g', '--force', pkg + '@latest']
   const result = spawnSync(command, args, {
     stdio: 'inherit',
     shell: process.platform === 'win32',
@@ -136,7 +136,7 @@ function main() {
       console.error(
         `[${WRAPPER_NAME} postinstall] Native package "${info.pkg}" not found and latest install failed.`,
       )
-      console.error('  Try again with: npm install -g ' + info.pkg + '@latest')
+      console.error('  Try again with: npm install -g --force ' + info.pkg + '@latest')
       process.exitCode = 1
     }
   }
