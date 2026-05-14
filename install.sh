@@ -255,12 +255,15 @@ if [[ -z "$FINAL_KEY" ]]; then
     while true; do
         printf "  Key (Enter = skip): "
         read -rs raw; echo
-        if   [[ -z "$raw" ]];           then warn "skipped — set manually later"; break
+        if   [[ -z "$raw" ]];           then FINAL_KEY=""; warn "skipped — set manually later"; break
         elif [[ "$raw" == sk-ant-* ]];  then FINAL_KEY="$raw"; ok "key ok"; break
         else warn "must start with sk-ant-  try again"
         fi
     done
 fi
+
+# Ensure FINAL_KEY is defined (prevent unbound variable)
+FINAL_KEY="${FINAL_KEY:-}"
 
 # ── base url (optional, for custom endpoint) ──────────────────
 printf "\n  ${BLD}Base URL${NC} ${DIM}(leave empty for default Anthropic)${NC}\n"
