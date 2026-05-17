@@ -213,6 +213,20 @@ function getBinaryPath(options = {}) {
   }
 }
 
+function runNative(binaryPath, args) {
+  const env = { ...process.env, CLAUDE_CODE_INSTALLED_VIA_NPM_WRAPPER: '1' }
+  if (process.platform === 'android') {
+    return spawnSync('grun', [binaryPath, ...args], {
+      stdio: 'inherit',
+      env,
+    })
+  }
+  return spawnSync(binaryPath, args, {
+    stdio: 'inherit',
+    env,
+  })
+}
+
 function main() {
   const args = process.argv.slice(2)
   const forceUpdate = args[0] === 'update' || args[0] === '--update' || args[0] === '-update'
@@ -223,16 +237,10 @@ function main() {
   }
 
   const binaryPath = getBinaryPath()
-  const result = spawnSync(binaryPath, args, {
-    stdio: 'inherit',
-    env: { ...process.env, CLAUDE_CODE_INSTALLED_VIA_NPM_WRAPPER: '1' },
-  })
+  const result = runNative(binaryPath, args)
   if (result.error && result.error.code === 'ENOENT') {
     const retryPath = getBinaryPath({ forceUpdate: true })
-    const retry = spawnSync(retryPath, args, {
-      stdio: 'inherit',
-      env: { ...process.env, CLAUDE_CODE_INSTALLED_VIA_NPM_WRAPPER: '1' },
-    })
+    const retry = runNative(retryPath, args)
     if (!retry.error) {
       if (retry.signal) {
         const signum = constants.signals[retry.signal] ?? 0

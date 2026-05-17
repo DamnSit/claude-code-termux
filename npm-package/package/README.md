@@ -29,7 +29,7 @@ claude
 ```bash
 claude              # Start Claude Code
 claude --version    # Check version
-claude update       # Force update to latest Claude Code packages
+claude update       # Force update to latest native Claude Code package
 ```
 
 The wrapper checks npm at most once per day. If
@@ -38,6 +38,7 @@ installs the latest native Claude Code package before launching. The native pack
 uses npm `--force` because Termux reports `os=android` while the official
 binary package is tagged `os=linux`. Set
 `CLAUDE_CODE_TERMUX_NO_AUTO_UPDATE=1` to disable the daily check.
+On Android, the wrapper launches the official glibc binary through `grun`.
 
 ## Auth
 
