@@ -12,10 +12,14 @@ claude --version
 claude
 ```
 
+This package does not run a `postinstall` script. The native Claude Code
+binary is installed or repaired only when you run `claude` or `claude update`.
+
 ## Termux Patches
 
 - Platform detection: android → linux
 - Uses `@anthropic-ai/claude-code-linux-arm64` native binary
+- Launches the native glibc binary through `grun` on Android
 - Compatible with Termux environment
 
 ## Requirements
@@ -39,6 +43,13 @@ uses npm `--force` because Termux reports `os=android` while the official
 binary package is tagged `os=linux`. Set
 `CLAUDE_CODE_TERMUX_NO_AUTO_UPDATE=1` to disable the daily check.
 On Android, the wrapper launches the official glibc binary through `grun`.
+
+## Security Notes
+
+- No npm lifecycle scripts are defined.
+- No install-time code runs automatically.
+- No runtime dependency packages are bundled.
+- The wrapper invokes `npm` only for explicit update/repair behavior.
 
 ## Auth
 

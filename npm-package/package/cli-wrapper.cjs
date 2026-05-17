@@ -132,7 +132,6 @@ function npmViewLatest(pkg) {
     : ['view', pkg, 'version', '--silent']
   const result = spawnSync(command, args, {
     encoding: 'utf8',
-    shell: process.platform === 'win32',
   })
   if (result.status !== 0) return null
   return result.stdout.trim()
@@ -149,7 +148,6 @@ function npmInstallLatest(packages) {
     args,
     {
       stdio: 'inherit',
-      shell: process.platform === 'win32',
     },
   )
   return result.status === 0
