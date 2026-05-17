@@ -20,7 +20,7 @@ For most users, use the shell installer. It installs Termux packages, downloads 
 | Method | Best for | Command |
 | --- | --- | --- |
 | Shell installer | Beginners and normal Termux installs | `curl -fsSL .../install-secure.sh \| bash` |
-| NPM package | Users who want npm-managed updates | `npm install -g @xurxuo/claude-code-termux` |
+| NPM package | Users who want npm-managed updates | `npm install -g @xurxuo/claude-code-termux@latest` |
 | Rust wrapper | Developers who want a compiled wrapper | Build from `rust-wrapper/` |
 
 ## Method 1: Shell Install
@@ -60,7 +60,7 @@ Use this if you want npm to manage the wrapper package.
 ```bash
 pkg update
 pkg install nodejs-lts
-npm install -g @xurxuo/claude-code-termux
+npm install -g @xurxuo/claude-code-termux@latest
 claude --version
 claude
 ```
