@@ -1,99 +1,107 @@
-# Build Rust Wrapper untuk Android ARM64
+# Building the Rust Wrapper
 
-## Cara Build
+The Rust wrapper is optional. Use it if you want a compiled launcher instead of the shell or npm launcher.
 
-### Method 1: Build di Termux langsung
+Most users should use the shell installer or npm package from the main README.
+
+## Build on Termux
 
 ```bash
-# Install Rust
-pkg install rust
-
-# Clone repo
-cd ~/claude-code-termux/rust-wrapper
-
-# Build dengan musl target untuk static binary
-cargo build --release --target aarch64-linux-musl
-
-# Output ada di target/aarch64-linux-musl/release/claude-termux
+pkg update
+pkg install git rust
+git clone https://github.com/DamnSit/claude-code-termux.git
+cd claude-code-termux/rust-wrapper
+cargo build --release
 ```
 
-### Method 2: Cross-compile dari PC
+The binary will be created at:
 
-**Install cross-compile toolchain:**
+```text
+target/release/claude-termux
+```
+
+Install it into your Termux PATH:
+
 ```bash
-# macOS
-rustup target add aarch64-unknown-linux-gnu
-
-# Linux
-rustup target add aarch64-unknown-linux-gnu
-# + install gcc-aarch64-linux-gnu
-
-# Windows (WSL)
-rustup target add aarch64-unknown-linux-gnu
+cp target/release/claude-termux $PREFIX/bin/claude
+chmod +x $PREFIX/bin/claude
+claude --version
 ```
 
-**Build:**
+## Cross-Compile from Linux
+
+Install the ARM64 target and cross compiler:
+
+```bash
+rustup target add aarch64-unknown-linux-gnu
+sudo apt install gcc-aarch64-linux-gnu
+```
+
+Build:
+
 ```bash
 cd rust-wrapper
 cargo build --release --target aarch64-unknown-linux-gnu
 ```
 
-### Method 3: Build static binary (recommend untuk Termux)
+The binary will be created at:
+
+```text
+target/aarch64-unknown-linux-gnu/release/claude-termux
+```
+
+Copy that binary to Termux and place it at:
+
+```text
+$PREFIX/bin/claude
+```
+
+## Static Build Notes
+
+Static builds may need extra toolchain setup and can fail depending on your Termux/Rust environment.
+
+Try:
 
 ```bash
-# Di Termux
 pkg install rust binutils
-
-# Build static
 RUSTFLAGS="-C target-feature=+crt-static" cargo build --release
+```
 
-# Atau pakai musl
+Or use a musl target if your environment supports it:
+
+```bash
+rustup target add aarch64-unknown-linux-musl
 cargo build --release --target aarch64-unknown-linux-musl
 ```
-
-## Output
-
-Binary akan ada di:
-- `target/release/claude-termux` (jika di Termux)
-- `target/aarch64-unknown-linux-gnu/release/claude-termux` (cross-compile)
-
-## Install ke Termux
-
-```bash
-# Copy binary ke PATH
-cp target/aarch64-unknown-linux-gnu/release/claude-termux \
-   /data/data/com.termux/files/usr/bin/claude
-
-# Make executable
-chmod +x /data/data/com.termux/files/usr/bin/claude
-
-# Test
-claude --help
-```
-
-## Build Notes
-
-- Minimum Rust version: 1.70+
-- Dependencies sudah pakai `anyhow` untuk error handling yang baik
-- `crossterm` untuk cross-platform terminal operations
-- `clap` untuk CLI argument parsing
 
 ## Troubleshooting
 
-### "linker `aarch64-linux-gnu-gcc` not found"
-```bash
-# Ubuntu/Debian
-sudo apt install gcc-aarch64-linux-gnu
+### `linker aarch64-linux-gnu-gcc not found`
 
-# macOS
-# Hanya bisa cross-compile via Docker atau Linux VM
+On Ubuntu/Debian:
+
+```bash
+sudo apt install gcc-aarch64-linux-gnu
 ```
 
-### Static build gagal
-```bash
-# Install musl target
-rustup target add aarch64-unknown-linux-musl
+### `cargo build` fails on Termux
 
-# Build
-cargo build --release --target aarch64-unknown-linux-musl
+Update packages and retry:
+
+```bash
+pkg update
+pkg upgrade
+pkg install rust binutils
+cargo clean
+cargo build --release
+```
+
+### `claude` still points to another package
+
+An older npm or shell install may already own `$PREFIX/bin/claude`.
+
+```bash
+rm -f $PREFIX/bin/claude
+cp target/release/claude-termux $PREFIX/bin/claude
+chmod +x $PREFIX/bin/claude
 ```

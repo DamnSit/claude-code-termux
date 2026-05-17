@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -623,15 +623,15 @@ footer {
     </h1>
 
     <p class="hero-sub">
-      Jalankan <strong>Claude Code</strong> langsung di Android ARM64 —
-      tanpa Ubuntu, tanpa proot-distro, tanpa cloud VM.
-      Satu command. Full native performance.
+      Run <strong>Claude Code</strong> directly on Android ARM64 with Termux.
+      No Ubuntu, no proot distro, no cloud VM.
+      Choose shell, npm, or a Rust wrapper.
     </p>
 
     <div class="hero-cta">
       <a href="#install" class="btn-primary">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 2v14m0 0l-4-4m4 4l4-4M3 18h18"/></svg>
-        Install Sekarang
+        Install Now
       </a>
       <a href="https://github.com/DamnSit/claude-code-termux" target="_blank" rel="noopener noreferrer" class="btn-ghost">
         <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
@@ -656,7 +656,7 @@ footer {
           <div><span class="t-out-ok">  ✓ Platform patch applied (android → linux)</span></div>
           <div><span class="t-out-dim">  ▸ Enter API key: </span><span class="t-out-ok">••••••••••••••••••••••••</span></div>
           <div style="margin-top:8px"><span class="t-out-ok">  ╔══════════════════════════════╗</span></div>
-          <div><span class="t-out-ok">  ║ ✅ Claude Code siap digunakan! ║</span></div>
+          <div><span class="t-out-ok">  ║ ✅ Claude Code is ready!      ║</span></div>
           <div><span class="t-out-ok">  ╚══════════════════════════════╝</span></div>
           <div style="margin-top:8px"><span class="t-prompt">$ </span><span class="t-cmd">claude</span></div>
           <div><span class="t-out-ok">  Claude Code v1.x.x (Native ARM64)</span></div>
@@ -673,28 +673,28 @@ footer {
 <!-- PROBLEM -->
 <section id="problem">
   <div class="wrap">
-    <div class="section-label reveal">Masalah</div>
-    <h2 class="section-title reveal">Claude Code tidak jalan<br><em>di Android.</em></h2>
-    <p class="section-sub reveal">Tiga alasan kenapa install normal selalu gagal — dan kenapa workaround lama tidak cukup.</p>
+    <div class="section-label reveal">Problem</div>
+    <h2 class="section-title reveal">Claude Code is not built<br><em>for Android.</em></h2>
+    <p class="section-sub reveal">A normal install fails because Android is not a standard glibc Linux environment.</p>
 
     <div class="problem-grid">
       <div class="problem-card reveal reveal-delay-1">
         <div class="prob-num">01 / 03</div>
         <div class="prob-icon">⚙️</div>
         <div class="prob-title">Binary glibc vs Bionic</div>
-        <p class="prob-text">Binary resmi Anthropic dikompilasi untuk glibc Linux. Android menggunakan Bionic libc dengan ABI berbeda — binary tidak bisa jalan langsung.</p>
+        <p class="prob-text">The official Anthropic binary is built for glibc Linux. Android uses Bionic libc, so the binary cannot be executed directly.</p>
       </div>
       <div class="problem-card reveal reveal-delay-2">
         <div class="prob-num">02 / 03</div>
         <div class="prob-icon">📁</div>
-        <div class="prob-title">/tmp tidak tersedia</div>
-        <p class="prob-text">Claude Code hardcode path <code>/tmp</code> untuk IPC socket dan temporary files. Path ini tidak ada di Android, menyebabkan crash saat startup.</p>
+        <div class="prob-title">Termux paths differ</div>
+        <p class="prob-text">Android and Termux use different filesystem paths and runtime behavior than a normal Linux distribution.</p>
       </div>
       <div class="problem-card reveal reveal-delay-3">
         <div class="prob-num">03 / 03</div>
         <div class="prob-icon">⏳</div>
-        <div class="prob-title">Versi lama = fitur terbatas</div>
-        <p class="prob-text">Workaround selama ini: pin ke v2.1.112 (JS only, via node cli.js). Latest version dari Anthropic sama sekali tidak bisa dijalankan.</p>
+        <div class="prob-title">Old pins are fragile</div>
+        <p class="prob-text">Pinning old JavaScript-only versions avoids the native binary problem, but it leaves users behind official Claude Code releases.</p>
       </div>
     </div>
   </div>
@@ -705,27 +705,27 @@ footer {
 <!-- SOLUTION -->
 <section id="solution">
   <div class="wrap">
-    <div class="section-label reveal">Solusi</div>
+    <div class="section-label reveal">Solution</div>
     <h2 class="section-title reveal">Native binary +<br><em>glibc-runner.</em></h2>
-    <p class="section-sub reveal">Tiga layer yang bekerja bersama untuk menjalankan binary resmi Anthropic secara native di Termux.</p>
+    <p class="section-sub reveal">This project combines the official Linux ARM64 binary with Termux-specific launchers.</p>
 
     <div class="solution-grid">
       <div class="sol-card reveal reveal-delay-1">
         <div class="sol-glyph">⚡</div>
         <div class="sol-title">glibc-runner</div>
-        <p class="sol-text">Jalankan binary glibc resmi langsung di Android Bionic via <code>grun</code> — tanpa full Linux environment, tanpa proot-distro, tanpa Ubuntu.</p>
+        <p class="sol-text">Run the official glibc binary on Android through <code>grun</code>, without a full Linux container, proot distro, or Ubuntu install.</p>
         <span class="sol-tag">grun · Termux pkg</span>
       </div>
       <div class="sol-card reveal reveal-delay-2">
         <div class="sol-glyph">🔧</div>
         <div class="sol-title">Platform Patch</div>
-        <p class="sol-text">Auto-patch <code>cli-wrapper.cjs</code> & <code>install.cjs</code>: deteksi <code>android</code> → redirect ke <code>linux</code>. Official ARM64 binary langsung terdeteksi dengan benar.</p>
-        <span class="sol-tag">awk · in-place patch</span>
+        <p class="sol-text">The npm wrapper detects Android, installs the Linux ARM64 native package with the right flags, and launches it through <code>grun</code>.</p>
+        <span class="sol-tag">npm · grun · android</span>
       </div>
       <div class="sol-card reveal reveal-delay-3">
         <div class="sol-glyph">🚀</div>
         <div class="sol-title">Latest Version</div>
-        <p class="sol-text">Bukan versi lama frozen. Binary ARM64 terbaru langsung dari npm <code>@anthropic-ai/claude-code-linux-arm64</code>, performa native penuh.</p>
+        <p class="sol-text">Use the latest official ARM64 binary from <code>@anthropic-ai/claude-code-linux-arm64</code>, with update support from the wrapper.</p>
         <span class="sol-tag">npm latest · ARM64</span>
       </div>
     </div>
@@ -737,16 +737,16 @@ footer {
 <!-- ARCHITECTURE -->
 <section id="arch">
   <div class="wrap">
-    <div class="section-label reveal">Arsitektur</div>
-    <h2 class="section-title reveal">Cara <em>keraktunya.</em></h2>
-    <p class="section-sub reveal">Semua layer berjalan native di Termux — tidak ada VM, tidak ada container, tidak ada overhead.</p>
+    <div class="section-label reveal">Architecture</div>
+    <h2 class="section-title reveal">How it <em>runs.</em></h2>
+    <p class="section-sub reveal">The launcher stays small: Termux calls <code>grun</code>, and <code>grun</code> starts the official Linux ARM64 binary.</p>
 
     <div class="arch-diagram reveal">
       <div class="arch-node">
         <div class="arch-box">
           <div class="ab-label">claude</div>
-          <div class="ab-sub">Shell alias</div>
-          <div class="ab-tech">~/.bashrc</div>
+          <div class="ab-sub">Launcher</div>
+          <div class="ab-tech">shell/npm/rust</div>
         </div>
       </div>
       <div class="arch-arrow">
@@ -779,11 +779,11 @@ footer {
         <div class="arch-box">
           <div class="ab-label">API</div>
           <div class="ab-sub">Anthropic</div>
-          <div class="ab-tech">custom endpoint ✓</div>
+          <div class="ab-tech">official API</div>
         </div>
       </div>
       <p class="arch-foot">
-        <strong>100% native.</strong> Tidak ada emulasi, tidak ada container. Binary ARM64 resmi berjalan langsung di hardware.
+        <strong>Native ARM64.</strong> No VM and no Linux container. The official binary runs through the Termux glibc bridge.
       </p>
     </div>
   </div>
@@ -795,14 +795,14 @@ footer {
 <section id="install">
   <div class="wrap">
     <div class="section-label reveal">Install</div>
-    <h2 class="section-title reveal">Pilih cara <em>install.</em></h2>
-    <p class="section-sub reveal">Tiga opsi tersedia. Shell script direkomendasikan — handle semua setup otomatis.</p>
+    <h2 class="section-title reveal">Choose an <em>install method.</em></h2>
+    <p class="section-sub reveal">Shell is best for beginners. NPM is best for npm-managed updates. Rust is for developers who want a compiled launcher.</p>
 
     <div class="reveal">
       <div class="install-tabs">
-        <button class="tab-btn active" onclick="switchTab('shell', this)">Shell (Recommended)</button>
+        <button class="tab-btn active" onclick="switchTab('shell', this)">Shell</button>
         <button class="tab-btn" onclick="switchTab('npm', this)">NPM</button>
-        <button class="tab-btn" onclick="switchTab('secure', this)">Secure (Checksum)</button>
+        <button class="tab-btn" onclick="switchTab('rust', this)">Rust</button>
       </div>
 
       <!-- Shell -->
@@ -810,17 +810,17 @@ footer {
         <div class="install-block">
           <div class="ib-head">
             <span class="ib-head-label">bash · termux</span>
-            <button class="copy-btn" onclick="copyCmd(this, 'curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash')">Copy</button>
+            <button class="copy-btn" onclick="copyCmd(this, 'curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install-secure.sh | bash')">Copy</button>
           </div>
           <div class="ib-body">
             <code>
-              <span class="c-prompt">$ </span><span class="c-cmd">curl <span class="c-flag">-fsSL</span> <span class="c-str">https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh</span> | bash</span>
+              <span class="c-prompt">$ </span><span class="c-cmd">curl <span class="c-flag">-fsSL</span> <span class="c-str">https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install-secure.sh</span> | bash</span>
             </code>
           </div>
         </div>
         <div class="install-note">
           <span class="note-icon">ℹ</span>
-          <span>Installer akan handle: pkg update, deps (nodejs-lts, glibc-runner), npm install, platform patch, API key input, alias setup. Setelah selesai: <code>source ~/.bashrc && claude</code></span>
+          <span>Recommended for beginners. Verifies checksums, installs Termux dependencies, downloads the native ARM64 binary, and creates the <code>claude</code> launcher.</span>
         </div>
       </div>
 
@@ -840,26 +840,28 @@ footer {
         </div>
         <div class="install-note">
           <span class="note-icon">ℹ</span>
-          <span>Install via NPM registry. Package wrapper yang handle setup otomatis. Sama dengan shell method tapi via npm.</span>
+          <span>Installs the npm-managed wrapper. It updates the official native package and launches it through <code>grun</code> on Android.</span>
         </div>
       </div>
 
-      <!-- Secure -->
-      <div class="install-panel" id="panel-secure">
+      <!-- Rust -->
+      <div class="install-panel" id="panel-rust">
         <div class="install-block">
           <div class="ib-head">
-            <span class="ib-head-label">bash · verified · termux</span>
-            <button class="copy-btn" onclick="copyCmd(this, 'curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install-secure.sh | bash')">Copy</button>
+            <span class="ib-head-label">cargo · termux</span>
+            <button class="copy-btn" onclick="copyCmd(this, 'pkg update && pkg install git rust && git clone https://github.com/DamnSit/claude-code-termux.git && cd claude-code-termux/rust-wrapper && cargo build --release')">Copy</button>
           </div>
           <div class="ib-body">
             <code>
-              <span class="c-prompt">$ </span><span class="c-cmd">curl <span class="c-flag">-fsSL</span> <span class="c-str">https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install-secure.sh</span> | bash</span>
+              <span class="c-prompt">$ </span><span class="c-cmd">pkg update && pkg install <span class="c-str">git rust</span></span><br>
+              <span class="c-prompt">$ </span><span class="c-cmd">git clone <span class="c-str">https://github.com/DamnSit/claude-code-termux.git</span></span><br>
+              <span class="c-prompt">$ </span><span class="c-cmd">cd claude-code-termux/rust-wrapper && cargo build <span class="c-flag">--release</span></span>
             </code>
           </div>
         </div>
         <div class="install-note">
-          <span class="note-icon">⚠</span>
-          <span><strong>Recommended.</strong> Verifies SHA256 checksums sebelum eksekusi. Lebih aman terhadap MITM attack. Checksums: <code>CHECKSUMS.txt</code></span>
+          <span class="note-icon">ℹ</span>
+          <span>For developers. Copy <code>target/release/claude-termux</code> to <code>$PREFIX/bin/claude</code> after the build finishes.</span>
         </div>
       </div>
     </div>
@@ -867,7 +869,7 @@ footer {
     <!-- Custom endpoint note -->
     <div class="install-block reveal" style="margin-top:32px">
       <div class="ib-head">
-        <span class="ib-head-label">~/.claude/settings.json — custom endpoint</span>
+        <span class="ib-head-label">~/.claude/settings.json — optional environment</span>
         <button class="copy-btn" onclick="copyCmd(this, JSON.stringify({env:{ANTHROPIC_BASE_URL:'https://opencode.ai/zen',ANTHROPIC_MODEL:'claude-sonnet-4-5',ANTHROPIC_API_KEY:'sk-ant-...'}},null,2))">Copy</button>
       </div>
       <div class="ib-body">
@@ -891,16 +893,16 @@ footer {
 <!-- COMPARISON -->
 <section id="compare">
   <div class="wrap">
-    <div class="section-label reveal">Perbandingan</div>
-    <h2 class="section-title reveal">vs <em>setup lain.</em></h2>
-    <p class="section-sub reveal">Kenapa ini berbeda dari workaround yang sudah ada sebelumnya.</p>
+    <div class="section-label reveal">Comparison</div>
+    <h2 class="section-title reveal">Compared with <em>other setups.</em></h2>
+    <p class="section-sub reveal">Why this is different from old pinned installs or a full proot Ubuntu environment.</p>
 
     <div class="reveal" style="overflow-x:auto">
       <table class="compare-table">
         <thead>
           <tr>
-            <th>Aspek</th>
-            <th class="hl">Repo ini ✦</th>
+            <th>Aspect</th>
+            <th class="hl">This project ✦</th>
             <th>Pin v2.1.112</th>
             <th>proot Ubuntu</th>
           </tr>
@@ -913,28 +915,28 @@ footer {
             <td>x86_64 emulated</td>
           </tr>
           <tr>
-            <td>Versi</td>
+            <td>Version</td>
             <td class="hl"><strong>Latest</strong></td>
-            <td>Frozen (lama)</td>
+            <td>Frozen old version</td>
             <td>Latest</td>
           </tr>
           <tr>
-            <td>Performa</td>
+            <td>Performance</td>
             <td class="hl"><span class="badge-native">🔥 Native</span></td>
             <td><span class="badge-warn">⚠ Node.js</span></td>
-            <td><span class="badge-slow">🐢 Emulasi</span></td>
+            <td><span class="badge-slow">🐢 Emulated/containerized</span></td>
           </tr>
           <tr>
-            <td>Butuh Ubuntu</td>
-            <td class="hl"><span class="icon-no">✗</span> Tidak perlu</td>
-            <td><span class="icon-no">✗</span> Tidak perlu</td>
-            <td><span class="icon-yes">✓</span> Dibutuhkan</td>
+            <td>Needs Ubuntu</td>
+            <td class="hl"><span class="icon-no">✗</span> No</td>
+            <td><span class="icon-no">✗</span> No</td>
+            <td><span class="icon-yes">✓</span> Yes</td>
           </tr>
           <tr>
             <td>Setup</td>
             <td class="hl"><strong>1 command</strong></td>
-            <td>Manual + banyak step</td>
-            <td>Manual + besar (1GB+)</td>
+            <td>Manual multi-step</td>
+            <td>Large manual setup (1GB+)</td>
           </tr>
           <tr>
             <td>Custom endpoint</td>
@@ -962,8 +964,8 @@ footer {
     <div class="cta-glow">
       <div class="cta-glow-ring"></div>
       <h2 class="cta-big reveal">
-        Mulai sekarang.<br>
-        <span class="accent">Satu command.</span>
+        Start on Android.<br>
+        <span class="accent">One command.</span>
       </h2>
     </div>
     <p class="cta-sub reveal">Android ARM64 · No root · No emulator · No Ubuntu</p>
