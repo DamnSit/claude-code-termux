@@ -14,12 +14,27 @@ echo "📦 Installing packages..."
 pkg update -y -q 2>/dev/null || true
 pkg install -y nodejs-lts git wget 2>/dev/null || true
 
-# Try different names for glibc-runner
+# Install glibc repository first
+pkg install -y glibc-repo 2>/dev/null || true
+pkg update -y -q 2>/dev/null || true
+
+# Install glibc-runner
 if ! command -v grun &>/dev/null; then
     echo "🔍 Looking for glibc-runner..."
     pkg install -y grun 2>/dev/null || \
-    pkg install -y glibc-runner 2>/dev/null || \
-    pkg install -y termux-api 2>/dev/null || true
+    pkg install -y glibc-runner 2>/dev/null || true
+fi
+
+# Verify grun exists
+if ! command -v grun &>/dev/null; then
+    echo ""
+    echo "❌ glibc-runner (grun) not found"
+    echo ""
+    echo "Try manually:"
+    echo "pkg install glibc-repo"
+    echo "pkg update"
+    echo "pkg install glibc-runner"
+    exit 1
 fi
 
 # Create temp dir in PREFIX (writable)
@@ -65,6 +80,35 @@ fi
 echo "🔧 Creating wrapper..."
 WRAPPER_FILE="/data/data/com.termux/files/usr/bin/claude"
 rm -f "$WRAPPER_FILE"
+
+# Write wrapper
+printf '%s\n' \
+'#!/bin/bash' \
+'exec grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude "$@"' \
+> "$WRAPPER_FILE"
+chmod +x "$WRAPPER_FILE"
+echo "   ✓ Wrapper created"
+
+# Backup npm wrapper to prevent overwrite
+if [[ -f "/data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" ]]; then
+    mv /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe.bak 2>/dev/null || true
+fi
+
+# Test
+echo ""
+echo "✅ Done!"
+echo "Testing native binary..."
+grun /data/data/com.termux/files/usr/lib/node_modules/@anthropic-ai/claude-code-linux-arm64/claude --version || {
+    echo ""
+    echo "❌ Claude binary test failed"
+    exit 1
+}
+
+echo ""
+echo "Usage: claude --version  (test)"
+echo "       claude             (start)"
+echo ""
+echo "⚠️  Set API key: export ANTHROPIC_API_KEY=sk-ant-..."rm -f "$WRAPPER_FILE"
 
 # Write wrapper using printf (more reliable than heredoc)
 if command -v grun &>/dev/null; then
