@@ -23,52 +23,27 @@ Do not use the Google Play version of Termux. It is outdated and commonly breaks
 
 ## Choose an Install Method
 
-For most users, use the shell installer. It installs Termux packages, downloads the official native binary, creates the `claude` launcher, and keeps your setup simple.
+For most users, use the npm installer. It installs everything automatically, manages updates, and keeps your setup simple.
 
 | Method | Best for | Command |
 | --- | --- | --- |
-| Shell installer | Beginners and normal Termux installs | `curl -fsSL .../install-secure.sh \| bash` |
-| NPM package | Users who want npm-managed updates | `npm install -g @xurxuo/claude-code-termux@latest` |
+| **NPM package (Recommended)** | **Most users — auto install & update** | **`npm install -g @xurxuo/claude-code-termux@latest`** |
+| Shell installer | Beginners and manual installs | `curl -fsSL .../install-secure.sh \| bash` |
 | Rust wrapper | Developers who want a compiled wrapper | Build from `rust-wrapper/` |
 
-## Method 1: Shell Install
+## Method 1: NPM Install (Recommended)
 
-Recommended for beginners.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install-secure.sh | bash
-```
-
-The secure installer downloads `CHECKSUMS.txt`, verifies `install.sh`, and refuses to run if verification fails.
-
-If you want the shorter standard installer:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
-```
-
-The shell installer does the following:
-
-1. Installs Termux dependencies such as `nodejs-lts`, `git`, `wget`, and `glibc-runner` when available.
-2. Downloads the official `@anthropic-ai/claude-code-linux-arm64` binary.
-3. Creates `$PREFIX/bin/claude`.
-4. Runs the binary through `grun`.
-
-Test it:
-
-```bash
-claude --version
-claude
-```
-
-## Method 2: NPM Install
-
-Use this if you want npm to manage the wrapper package.
+The easiest way to install. npm handles everything automatically.
 
 ```bash
 pkg update
 pkg install nodejs-lts
 npm install -g @xurxuo/claude-code-termux@latest
+```
+
+Verify it works:
+
+```bash
 claude --version
 claude
 ```
@@ -96,6 +71,36 @@ Disable daily auto-checks:
 
 ```bash
 export CLAUDE_CODE_TERMUX_NO_AUTO_UPDATE=1
+```
+
+## Method 2: Shell Install
+
+For users who prefer a direct shell installer without npm.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install-secure.sh | bash
+```
+
+The secure installer downloads `CHECKSUMS.txt`, verifies `install.sh`, and refuses to run if verification fails.
+
+If you want the shorter standard installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
+```
+
+The shell installer does the following:
+
+1. Installs Termux dependencies such as `nodejs-lts`, `git`, `wget`, and `glibc-runner` when available.
+2. Downloads the official `@anthropic-ai/claude-code-linux-arm64` binary.
+3. Creates `$PREFIX/bin/claude`.
+4. Runs the binary through `grun`.
+
+Test it:
+
+```bash
+claude --version
+claude
 ```
 
 ## Method 3: Rust Wrapper
