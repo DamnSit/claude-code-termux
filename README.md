@@ -107,6 +107,16 @@ claude --version
 claude
 ```
 
+Update to the latest version:
+
+```bash
+claude update
+claude --update
+claude -update
+```
+
+All three commands do the same thing — force an immediate update with an animated progress UI.
+
 ## Method 3: Rust Wrapper
 
 The Rust wrapper is for developers who want a compiled launcher instead of the shell or npm launcher.
