@@ -214,16 +214,16 @@ function getBinaryPath(options = {}) {
 function runNative(binaryPath, args) {
   const env = { ...process.env, CLAUDE_CODE_INSTALLED_VIA_NPM_WRAPPER: '1' }
   if (process.platform === 'android') {
+    // cek grun dulu
     const grunCheck = spawnSync('which', ['grun'], { encoding: 'utf8' })
     if (grunCheck.status !== 0 || !grunCheck.stdout.trim()) {
       console.error(`[${WRAPPER_NAME}] ERROR: grun not found — run: pkg install glibc-runner`)
       process.exit(1)
     }
-    return spawnSync('grun', [binaryPath, ...args], {
-      stdio: 'inherit',
-      env,
-    })
+    return spawnSync('grun', [binaryPath, ...args], { stdio: 'inherit', env })
   }
+  return spawnSync(binaryPath, args, { stdio: 'inherit', env })
+}
 
 function main() {
   const args = process.argv.slice(2)
