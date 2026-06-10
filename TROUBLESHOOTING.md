@@ -79,6 +79,19 @@ Upgrade can overwrite node_modules. Re-run installer.
 
 ---
 
+## `claude update` shows "Claude is managed by a package manager"
+
+This happens when `/usr/bin/claude` is using a simple wrapper instead of the proper npm wrapper.
+
+**Fix:**
+```bash
+npm install -g --force @xurxuo/claude-code-termux@latest
+```
+
+This reinstalls the wrapper with proper update handling. After this, `claude update` will work correctly.
+
+---
+
 ## Slow / hang on first launch
 
 Normal — glibc-runner needs first-time init. Wait ~5 seconds.
