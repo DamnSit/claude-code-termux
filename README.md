@@ -66,6 +66,9 @@ The npm wrapper:
 - Uses `npm --force` only for the native package because Termux reports `os=android`, while the official native package is tagged as `os=linux`.
 - Launches the official glibc binary through `grun`.
 - Checks for native package updates at most once per day.
+- The `@latest` tag always points to the newest published wrapper version.
+
+Current latest release: `@xurxuo/claude-code-termux@latest`
 
 Force an update any time:
 
