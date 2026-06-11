@@ -1,6 +1,6 @@
 {
   "name": "@xurxuo/claude-code-termux",
-  "version": "2.1.173",
+  "version": "2.1.174",
   "bin": {
     "claude": "cli-wrapper.cjs"
   },
