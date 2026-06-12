@@ -87,27 +87,6 @@ function ensureGrun() {
     console.error(`[${WRAPPER_NAME}]   Try manually: pkg install glibc-repo && pkg update && pkg install grun`)
   }
 }
-
-// ─── Self-healing: ensure /usr/bin/claude wrapper points here ─────────────
-// If postinstall didn't run, npm's bin symlink should still exist and point
-// to this file (npm creates the bin symlink independent of lifecycle
-// scripts), so this is mostly a safety net for broken/partial installs.
-function ensureWrapperLink() {
-  if (!isTermux()) return
-  const WRAPPER_PATH = '/data/data/com.termux/files/usr/bin/claude'
-  try {
-    if (fs.existsSync(WRAPPER_PATH)) {
-      const stat = fs.lstatSync(WRAPPER_PATH)
-      if (stat.isSymbolicLink() || stat.isFile()) return
-    }
-    const CONTENT = `#!/data/data/com.termux/files/usr/bin/env node\nrequire(${JSON.stringify(__filename)})\n`
-    fs.writeFileSync(WRAPPER_PATH, CONTENT, { mode: 0o755 })
-    console.error(`[${WRAPPER_NAME}] Wrapper installed at ${WRAPPER_PATH}`)
-  } catch {
-    // best effort, ignore
-  }
-}
-
 function detectMusl() {
   // Termux: android is actually linux
   const platform = process.platform === 'android' ? 'linux' : process.platform
@@ -574,7 +553,6 @@ async function main() {
   const forceUpdate = args[0] === 'update' || args[0] === '--update' || args[0] === '-update'
 
   ensureGrun()
-  ensureWrapperLink()
 
   if (forceUpdate) {
     getBinaryPath({ forceUpdate: true })

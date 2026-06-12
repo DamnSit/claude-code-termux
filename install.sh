@@ -87,10 +87,26 @@ if [[ ! -x "$BINARY" ]]; then
     ok "Binary installed: $BINARY"
 fi
 
-# ─── 6. Install npm wrapper (postinstall writes the proper Node handler) ────────
-# This ensures claude update / claude manager work correctly for shell users.
+# ─── 6. Install npm wrapper + integrity self-heal ────────
+# claude update / claude manager work via npm's bin symlink -> cli-wrapper.cjs.
 info "Installing npm wrapper..."
 npm install -g --force @xurxuo/claude-code-termux@latest 2>/dev/null || true
+
+# Integrity self-heal: npm's `bin` field links /usr/bin/claude -> cli-wrapper.cjs.
+# On some npm/mirror setups the installed cli-wrapper.cjs ends up truncated/corrupt,
+# which makes `claude` silently do nothing. Verify it; restore from GitHub if broken.
+WRAPPER_CJS="/data/data/com.termux/files/usr/lib/node_modules/@xurxuo/claude-code-termux/cli-wrapper.cjs"
+if [[ ! -f "$WRAPPER_CJS" ]] || [[ "$(wc -l < "$WRAPPER_CJS" 2>/dev/null || echo 0)" -lt 50 ]] || ! grep -q "ensureGrun" "$WRAPPER_CJS" 2>/dev/null; then
+    warn "cli-wrapper.cjs missing or corrupt - restoring from GitHub..."
+    mkdir -p "$(dirname "$WRAPPER_CJS")"
+    if curl --proto '=https' --tlsv1.2 -fsSL \
+        "https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/npm-package/package/cli-wrapper.cjs" \
+        -o "$WRAPPER_CJS"; then
+        ok "cli-wrapper.cjs restored from GitHub"
+    else
+        warn "Could not restore cli-wrapper.cjs from GitHub"
+    fi
+fi
 ok "Wrapper ready"
 
 # ─── 7. Final test ────────────────────────────────────────────────────────────

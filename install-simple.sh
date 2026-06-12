@@ -61,10 +61,20 @@ else
     echo "   ⚠️ Download failed"
 fi
 
-# Install npm wrapper (postinstall writes the proper Node wrapper automatically)
-# This ensures claude update / claude manager work correctly.
+# Install npm wrapper. npm's bin field links /usr/bin/claude -> cli-wrapper.cjs,
+# which handles claude / claude update / claude manager.
 echo "📥 Installing npm wrapper..."
 npm install -g --force @xurxuo/claude-code-termux@latest 2>/dev/null || true
+
+# Integrity self-heal: restore cli-wrapper.cjs from GitHub if npm left it corrupt/truncated.
+WRAPPER_CJS="/data/data/com.termux/files/usr/lib/node_modules/@xurxuo/claude-code-termux/cli-wrapper.cjs"
+if [[ ! -f "$WRAPPER_CJS" ]] || [[ "$(wc -l < "$WRAPPER_CJS" 2>/dev/null || echo 0)" -lt 50 ]] || ! grep -q "ensureGrun" "$WRAPPER_CJS" 2>/dev/null; then
+    echo "   ⚠️ cli-wrapper.cjs corrupt — restoring from GitHub..."
+    mkdir -p "$(dirname "$WRAPPER_CJS")"
+    curl --proto '=https' --tlsv1.2 -fsSL \
+        "https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/npm-package/package/cli-wrapper.cjs" \
+        -o "$WRAPPER_CJS" && echo "   ✓ cli-wrapper.cjs restored" || echo "   ⚠️ restore failed"
+fi
 echo "   ✓ Wrapper created"
 
 # Test

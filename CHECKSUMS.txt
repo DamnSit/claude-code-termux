@@ -1,8 +1,8 @@
 # SHA256 checksums for install scripts
 # Verify before running: sha256sum -c CHECKSUMS.txt
 
-f1d0d37cf865c369324e040bef1586d42ea12c65ba45235780d85ec84f4cada2  install.sh
+919af31cffdae2b63c0ec379ec5e8602ef72940b1577bdddf9d1a6c05c660ec4  install.sh
 af33a0aafdad4855d406c07ac5c677eea0ad1d8f52130c48591ecc4f11be85e9  install-secure.sh
-5d44fb9060a2b4bd10f6cd8259021f22926adb13cc2cbea4a76e28e7ba5f3fda  install-simple.sh
+77672b8622e2b1da951587b747c8a59a950d7be8c48d56b726d54b3c6eb17b07  install-simple.sh
 71c71975dd47309a6057b4bf8cc519ae0f7a498c1bbedfcc6449c3d3e4f95be8  uninstall.sh
 8bb80fd038eb4068e955177c66619ef512531136a16d7835f70d39d7966ad18c  claude-wrapper.sh

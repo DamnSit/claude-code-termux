@@ -230,27 +230,10 @@ function main() {
       process.exitCode = 1
     }
   }
-
-  // Write the proper Node wrapper to /usr/bin/claude so both shell-install
-  // and npm-install users get the same handler (update, manager, etc.)
-  if (isTermux()) {
-    const WRAPPER_PATH = '/data/data/com.termux/files/usr/bin/claude'
-    const CL_WRAPPER = require.resolve('./cli-wrapper.cjs')
-    const CONTENT = `#!/data/data/com.termux/files/usr/bin/env node\nrequire(${JSON.stringify(CL_WRAPPER)})\n`
-    try {
-      // npm has already created `claude` as a SYMLINK pointing at cli-wrapper.cjs.
-      // Writing to WRAPPER_PATH directly would FOLLOW that symlink and overwrite
-      // cli-wrapper.cjs itself, corrupting the launcher (it becomes a 2-line file
-      // that just `require()`s itself -> `claude`, `claude manager`, `claude update`
-      // all silently do nothing). Remove the existing symlink/file FIRST so we
-      // create a standalone launcher and leave cli-wrapper.cjs intact.
-      try { fs.unlinkSync(WRAPPER_PATH) } catch {}
-      fs.writeFileSync(WRAPPER_PATH, CONTENT, { mode: 0o755 })
-      console.error(`[${WRAPPER_NAME}] Wrapper installed at ${WRAPPER_PATH}`)
-    } catch (e) {
-      console.error(`[${WRAPPER_NAME}] WARNING: could not write wrapper: ${e.message}`)
-    }
-  }
+  // NOTE: we deliberately do NOT write a launcher to /usr/bin/claude here.
+  // npm's `bin` field already links /usr/bin/claude -> cli-wrapper.cjs.
+  // Writing through that symlink used to overwrite (corrupt) cli-wrapper.cjs
+  // itself, turning `claude` into a silent no-op. The bin symlink is enough.
 }
 
 main()

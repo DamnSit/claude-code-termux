@@ -1,5 +1,38 @@
 # Troubleshooting
 
+## `claude` runs but prints nothing (silent, exit code 0)
+
+The installed `cli-wrapper.cjs` got corrupted into a 2-line file that just
+`require()`s itself (an infinite no-op). Older versions wrote a launcher to
+`/usr/bin/claude`, which npm had symlinked to `cli-wrapper.cjs` — writing through
+that symlink overwrote the real wrapper. Fixed in **2.1.176+**.
+
+Recover an existing broken install:
+```bash
+curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/npm-package/package/cli-wrapper.cjs \
+  -o /data/data/com.termux/files/usr/lib/node_modules/@xurxuo/claude-code-termux/cli-wrapper.cjs
+claude --version
+```
+Verify it is the real file (line count should be > 50, and grep should print `1`):
+```bash
+wc -l /data/data/com.termux/files/usr/lib/node_modules/@xurxuo/claude-code-termux/cli-wrapper.cjs
+grep -c ensureGrun /data/data/com.termux/files/usr/lib/node_modules/@xurxuo/claude-code-termux/cli-wrapper.cjs
+```
+
+---
+
+## npm `allow-scripts` warning (postinstall skipped)
+
+If npm warns `allow-scripts ... (postinstall: node install.cjs)`, the postinstall is
+skipped. That is fine on **2.1.176+** — `cli-wrapper.cjs` auto-installs `grun` on first
+run (`ensureGrun`), so `claude` still works. To let postinstall run anyway:
+```bash
+npm install -g --allow-scripts=@xurxuo/claude-code-termux @xurxuo/claude-code-termux@latest
+```
+
+---
+
+
 ## `command not found: claude`
 
 ```bash
