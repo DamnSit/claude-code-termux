@@ -37,6 +37,77 @@ const PLATFORMS = {
   },
 }
 
+function isTermux() {
+  return (
+    process.platform === 'android' ||
+    (process.env.PREFIX || '').includes('com.termux') ||
+    fs.existsSync('/data/data/com.termux/files/usr/bin/pkg')
+  )
+}
+
+function binExists(bin) {
+  const r = spawnSync('which', [bin], { encoding: 'utf8' })
+  return r.status === 0 && r.stdout.trim().length > 0
+}
+
+// ─── Self-healing: ensure grun exists ──────────────────────────────────────
+// Postinstall (install.cjs) may never run if the user's npm has an
+// allow-scripts policy that blocks postinstall scripts. So we can't rely on
+// it for critical setup. Instead, check/install grun here, at the start of
+// every `claude` invocation on Termux, so `npm install -g ... && claude`
+// works regardless of allow-scripts.
+function ensureGrun() {
+  if (!isTermux()) return
+  if (binExists('grun')) return
+
+  console.error(`[${WRAPPER_NAME}] grun (glibc-runner) not found — installing...`)
+
+  const updateResult = spawnSync('pkg', ['update', '-y'], { stdio: 'inherit' })
+  if (updateResult.status !== 0) {
+    console.error(`[${WRAPPER_NAME}] WARNING: pkg update failed, continuing anyway...`)
+  }
+
+  console.error(`[${WRAPPER_NAME}] Running: pkg install glibc-repo -y`)
+  spawnSync('pkg', ['install', 'glibc-repo', '-y'], { stdio: 'inherit' })
+
+  spawnSync('pkg', ['update', '-y'], { stdio: 'inherit' })
+
+  console.error(`[${WRAPPER_NAME}] Running: pkg install grun -y`)
+  let r = spawnSync('pkg', ['install', 'grun', '-y'], { stdio: 'inherit' })
+
+  if (r.status !== 0 || !binExists('grun')) {
+    console.error(`[${WRAPPER_NAME}] Trying fallback package name: glibc-runner`)
+    spawnSync('pkg', ['install', 'glibc-runner', '-y'], { stdio: 'inherit' })
+  }
+
+  if (binExists('grun')) {
+    console.error(`[${WRAPPER_NAME}] ✓ grun installed: ${spawnSync('which', ['grun'], { encoding: 'utf8' }).stdout.trim()}`)
+  } else {
+    console.error(`[${WRAPPER_NAME}] ✗ Could not install grun automatically.`)
+    console.error(`[${WRAPPER_NAME}]   Try manually: pkg install glibc-repo && pkg update && pkg install grun`)
+  }
+}
+
+// ─── Self-healing: ensure /usr/bin/claude wrapper points here ─────────────
+// If postinstall didn't run, npm's bin symlink should still exist and point
+// to this file (npm creates the bin symlink independent of lifecycle
+// scripts), so this is mostly a safety net for broken/partial installs.
+function ensureWrapperLink() {
+  if (!isTermux()) return
+  const WRAPPER_PATH = '/data/data/com.termux/files/usr/bin/claude'
+  try {
+    if (fs.existsSync(WRAPPER_PATH)) {
+      const stat = fs.lstatSync(WRAPPER_PATH)
+      if (stat.isSymbolicLink() || stat.isFile()) return
+    }
+    const CONTENT = `#!/data/data/com.termux/files/usr/bin/env node\nrequire(${JSON.stringify(__filename)})\n`
+    fs.writeFileSync(WRAPPER_PATH, CONTENT, { mode: 0o755 })
+    console.error(`[${WRAPPER_NAME}] Wrapper installed at ${WRAPPER_PATH}`)
+  } catch {
+    // best effort, ignore
+  }
+}
+
 function detectMusl() {
   // Termux: android is actually linux
   const platform = process.platform === 'android' ? 'linux' : process.platform
@@ -215,10 +286,10 @@ function getBinaryPath(options = {}) {
 function runNative(binaryPath, args) {
   const env = { ...process.env, CLAUDE_CODE_INSTALLED_VIA_NPM_WRAPPER: '1' }
   if (process.platform === 'android') {
-    // cek grun dulu
+    ensureGrun()
     const grunCheck = spawnSync('which', ['grun'], { encoding: 'utf8' })
     if (grunCheck.status !== 0 || !grunCheck.stdout.trim()) {
-      console.error(`[${WRAPPER_NAME}] ERROR: grun not found — run: pkg install glibc-runner`)
+      console.error(`[${WRAPPER_NAME}] ERROR: grun not found — run: pkg install glibc-repo && pkg update && pkg install grun`)
       process.exit(1)
     }
     return spawnSync('grun', [binaryPath, ...args], { stdio: 'inherit', env })
@@ -501,6 +572,9 @@ async function runManager() {
 async function main() {
   const args = process.argv.slice(2)
   const forceUpdate = args[0] === 'update' || args[0] === '--update' || args[0] === '-update'
+
+  ensureGrun()
+  ensureWrapperLink()
 
   if (forceUpdate) {
     getBinaryPath({ forceUpdate: true })
