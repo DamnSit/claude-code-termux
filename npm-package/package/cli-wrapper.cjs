@@ -278,14 +278,21 @@ function getBinaryPath(options = {}) {
 function runNative(binaryPath, args) {
   const env = { ...process.env, CLAUDE_CODE_INSTALLED_VIA_NPM_WRAPPER: '1' }
   if (process.platform === 'android') {
-    const grun = ensureGrun()
-    if (!grun) {
-      console.error(`[${WRAPPER_NAME}] ERROR: grun not found even after install.`)
-      console.error(`[${WRAPPER_NAME}]   Fix: pkg install glibc-repo && pkg update && pkg install --reinstall glibc-runner`)
-      console.error(`[${WRAPPER_NAME}]   If glibc-runner is installed, grun may be under $PREFIX/glibc/bin — add it to PATH.`)
-      process.exit(1)
+    // Run grun via PATH first — exactly what worked in 2.1.146. No `which`
+    // gatekeeping: some Termux setups lack the `which` binary, which made the
+    // old detection fail even though `grun` ran fine. Only if grun is genuinely
+    // missing (ENOENT) do we self-heal once, then retry with a resolved path.
+    let r = spawnSync('grun', [binaryPath, ...args], { stdio: 'inherit', env })
+    if (r.error && r.error.code === 'ENOENT') {
+      const grun = ensureGrun()
+      if (!grun) {
+        console.error(`[${WRAPPER_NAME}] ERROR: grun (glibc-runner) not found.`)
+        console.error(`[${WRAPPER_NAME}]   Fix: pkg install glibc-repo && pkg update && pkg install --reinstall glibc-runner`)
+        process.exit(1)
+      }
+      r = spawnSync(grun, [binaryPath, ...args], { stdio: 'inherit', env })
     }
-    return spawnSync(grun, [binaryPath, ...args], { stdio: 'inherit', env })
+    return r
   }
   return spawnSync(binaryPath, args, { stdio: 'inherit', env })
 }
