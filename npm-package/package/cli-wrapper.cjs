@@ -217,6 +217,70 @@ function npmInstallLatest(packages) {
   return result.status === 0
 }
 
+function npmGlobalRoot() {
+  const PREFIX = process.env.PREFIX || '/data/data/com.termux/files/usr'
+  return path.join(PREFIX, 'lib', 'node_modules')
+}
+
+function installedVersion(pkg) {
+  try {
+    return require(path.join(npmGlobalRoot(), pkg, 'package.json')).version
+  } catch {
+    return null
+  }
+}
+
+// If npm leaves cli-wrapper.cjs truncated/corrupt after an install (a known
+// npm/mirror quirk on some Termux setups), restore it from GitHub so an update
+// can never brick the launcher again.
+function selfHealWrapper() {
+  try {
+    const wrapperPath = path.join(npmGlobalRoot(), WRAPPER_NAME, 'cli-wrapper.cjs')
+    let content = ''
+    try { content = fs.readFileSync(wrapperPath, 'utf8') } catch {}
+    const intact = content.split('\n').length >= 50 && content.includes('runNative')
+    if (intact) return true
+    console.error(`[${WRAPPER_NAME}] Installed wrapper looks corrupt \u2014 restoring from GitHub...`)
+    const url = 'https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/npm-package/package/cli-wrapper.cjs'
+    const r = spawnSync('curl', ['-fsSL', url, '-o', wrapperPath], { stdio: 'inherit' })
+    const ok = r.status === 0
+    console.error(`[${WRAPPER_NAME}] ${ok ? '\u2713 wrapper restored from GitHub' : '\u26a0 could not restore wrapper (check network)'}`)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+// `claude update` \u2014 bring BOTH the wrapper and the native Claude Code binary
+// to their latest versions, then self-heal the wrapper file if needed.
+function runUpdate() {
+  const info = PLATFORMS[getPlatformKey()]
+  const nativePkg = info ? info.pkg : null
+
+  console.error(`[${WRAPPER_NAME}] Updating Claude Code to latest...`)
+
+  const wBefore = installedVersion(WRAPPER_NAME)
+  console.error(`[${WRAPPER_NAME}] \u2192 wrapper ${WRAPPER_NAME} (current ${wBefore || 'unknown'})`)
+  npmInstallLatest([WRAPPER_NAME])
+  selfHealWrapper()
+
+  if (nativePkg) {
+    const nBefore = installedVersion(nativePkg)
+    console.error(`[${WRAPPER_NAME}] \u2192 native ${nativePkg} (current ${nBefore || 'unknown'})`)
+    npmInstallLatest([nativePkg])
+  }
+
+  markUpdateChecked()
+
+  const wAfter = installedVersion(WRAPPER_NAME)
+  const nAfter = nativePkg ? installedVersion(nativePkg) : null
+  console.error('')
+  console.error(`[${WRAPPER_NAME}] \u2713 Update complete`)
+  console.error(`[${WRAPPER_NAME}]   wrapper: ${wAfter || 'unknown'}`)
+  console.error(`[${WRAPPER_NAME}]   native:  ${nAfter || 'unknown'}`)
+  console.error(`[${WRAPPER_NAME}]   (wrapper changes apply on next \`claude\` launch)`)
+}
+
 function refreshNativePackage(info, force = false) {
   if (!shouldCheckForUpdates(force)) return
 
@@ -423,6 +487,7 @@ async function managerUpdatePackages() {
   console.log(`  ${C.cyan}Updating @xurxuo/claude-code-termux...${C.reset}`)
   const r1 = npm(['install', '-g', '--force', '@xurxuo/claude-code-termux@latest'])
   console.log(`  ${r1.status === 0 ? C.green + '✓' : C.red + '✗'} Wrapper ${r1.status === 0 ? 'updated' : 'update failed'}${C.reset}`)
+  selfHealWrapper()
   console.log('')
   console.log(`  ${C.cyan}Updating @anthropic-ai/claude-code-linux-arm64...${C.reset}`)
   const r2 = npm(['install', '-g', '--force', '@anthropic-ai/claude-code-linux-arm64@latest'])
@@ -575,7 +640,7 @@ async function main() {
 
 
   if (forceUpdate) {
-    getBinaryPath({ forceUpdate: true })
+    runUpdate()
     process.exit(0)
   }
 
