@@ -50,42 +50,55 @@ function binExists(bin) {
   return r.status === 0 && r.stdout.trim().length > 0
 }
 
-// ─── Self-healing: ensure grun exists ──────────────────────────────────────
-// Postinstall (install.cjs) may never run if the user's npm has an
-// allow-scripts policy that blocks postinstall scripts. So we can't rely on
-// it for critical setup. Instead, check/install grun here, at the start of
-// every `claude` invocation on Termux, so `npm install -g ... && claude`
-// works regardless of allow-scripts.
+// ─── Resolve grun (glibc-runner) ─────────────────────────────────────────────
+// `grun` ships with the `glibc-runner` package. Depending on the build it lands
+// in $PREFIX/bin/grun or under $PREFIX/glibc/bin/grun (the latter is NOT on PATH,
+// so `which grun` fails even though glibc-runner is installed). Resolve it across
+// PATH + known absolute locations and return the full path (or null).
+function resolveGrun() {
+  const w = spawnSync('which', ['grun'], { encoding: 'utf8' })
+  if (w.status === 0 && w.stdout.trim()) return w.stdout.trim()
+  const PREFIX = process.env.PREFIX || '/data/data/com.termux/files/usr'
+  const candidates = [
+    PREFIX + '/bin/grun',
+    PREFIX + '/glibc/bin/grun',
+    '/data/data/com.termux/files/usr/bin/grun',
+    '/data/data/com.termux/files/usr/glibc/bin/grun',
+  ]
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) return c } catch {}
+  }
+  return null
+}
+
+// ─── Self-healing: ensure grun exists (runs at most once per invocation) ─────
+// install.cjs postinstall may be blocked by npm allow-scripts, so resolve/install
+// grun lazily here. NOTE: there is no package named `grun`; it is `glibc-runner`.
+let _grunPath = null
+let _grunInstallTried = false
 function ensureGrun() {
-  if (!isTermux()) return
-  if (binExists('grun')) return
+  if (_grunPath) return _grunPath
+  if (!isTermux()) { _grunPath = resolveGrun(); return _grunPath }
 
-  console.error(`[${WRAPPER_NAME}] grun (glibc-runner) not found — installing...`)
+  let g = resolveGrun()
+  if (g) { _grunPath = g; return g }
 
-  const updateResult = spawnSync('pkg', ['update', '-y'], { stdio: 'inherit' })
-  if (updateResult.status !== 0) {
-    console.error(`[${WRAPPER_NAME}] WARNING: pkg update failed, continuing anyway...`)
-  }
-
-  console.error(`[${WRAPPER_NAME}] Running: pkg install glibc-repo -y`)
-  spawnSync('pkg', ['install', 'glibc-repo', '-y'], { stdio: 'inherit' })
-
-  spawnSync('pkg', ['update', '-y'], { stdio: 'inherit' })
-
-  console.error(`[${WRAPPER_NAME}] Running: pkg install grun -y`)
-  let r = spawnSync('pkg', ['install', 'grun', '-y'], { stdio: 'inherit' })
-
-  if (r.status !== 0 || !binExists('grun')) {
-    console.error(`[${WRAPPER_NAME}] Trying fallback package name: glibc-runner`)
+  if (!_grunInstallTried) {
+    _grunInstallTried = true
+    console.error(`[${WRAPPER_NAME}] grun (glibc-runner) not found — installing once...`)
+    spawnSync('pkg', ['install', 'glibc-repo', '-y'], { stdio: 'inherit' })
+    spawnSync('pkg', ['update', '-y'], { stdio: 'inherit' })
     spawnSync('pkg', ['install', 'glibc-runner', '-y'], { stdio: 'inherit' })
+    g = resolveGrun()
+    if (!g) {
+      console.error(`[${WRAPPER_NAME}] grun still missing — repairing glibc-runner...`)
+      spawnSync('pkg', ['install', '--reinstall', 'glibc-runner', '-y'], { stdio: 'inherit' })
+      g = resolveGrun()
+    }
+    if (g) console.error(`[${WRAPPER_NAME}] ✓ grun ready: ${g}`)
   }
-
-  if (binExists('grun')) {
-    console.error(`[${WRAPPER_NAME}] ✓ grun installed: ${spawnSync('which', ['grun'], { encoding: 'utf8' }).stdout.trim()}`)
-  } else {
-    console.error(`[${WRAPPER_NAME}] ✗ Could not install grun automatically.`)
-    console.error(`[${WRAPPER_NAME}]   Try manually: pkg install glibc-repo && pkg update && pkg install grun`)
-  }
+  _grunPath = g
+  return g
 }
 function detectMusl() {
   // Termux: android is actually linux
@@ -265,13 +278,14 @@ function getBinaryPath(options = {}) {
 function runNative(binaryPath, args) {
   const env = { ...process.env, CLAUDE_CODE_INSTALLED_VIA_NPM_WRAPPER: '1' }
   if (process.platform === 'android') {
-    ensureGrun()
-    const grunCheck = spawnSync('which', ['grun'], { encoding: 'utf8' })
-    if (grunCheck.status !== 0 || !grunCheck.stdout.trim()) {
-      console.error(`[${WRAPPER_NAME}] ERROR: grun not found — run: pkg install glibc-repo && pkg update && pkg install grun`)
+    const grun = ensureGrun()
+    if (!grun) {
+      console.error(`[${WRAPPER_NAME}] ERROR: grun not found even after install.`)
+      console.error(`[${WRAPPER_NAME}]   Fix: pkg install glibc-repo && pkg update && pkg install --reinstall glibc-runner`)
+      console.error(`[${WRAPPER_NAME}]   If glibc-runner is installed, grun may be under $PREFIX/glibc/bin — add it to PATH.`)
       process.exit(1)
     }
-    return spawnSync('grun', [binaryPath, ...args], { stdio: 'inherit', env })
+    return spawnSync(grun, [binaryPath, ...args], { stdio: 'inherit', env })
   }
   return spawnSync(binaryPath, args, { stdio: 'inherit', env })
 }
@@ -357,7 +371,7 @@ async function managerStatus() {
   const keyStatus = apiKey ? `${apiKey.slice(0, 9)}...` : `${C.yellow}not set${C.reset}`
   console.log(bar('API Key', keyStatus, apiKey ? 'green' : 'yellow'))
 
-  const grun = spawnOutput('which', ['grun']).stdout.trim()
+  const grun = resolveGrun() || ''
   console.log(bar('glibc-runner (grun)', grun ? `✓ ${grun}` : `${C.red}✗ not found${C.reset}`, grun ? 'green' : 'red'))
 
   console.log('')
@@ -552,7 +566,6 @@ async function main() {
   const args = process.argv.slice(2)
   const forceUpdate = args[0] === 'update' || args[0] === '--update' || args[0] === '-update'
 
-  ensureGrun()
 
   if (forceUpdate) {
     getBinaryPath({ forceUpdate: true })
