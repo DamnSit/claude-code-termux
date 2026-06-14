@@ -6,14 +6,13 @@ echo "2) MiniMax (MiniMax-M3)"
 
 read -p "请输入选项: " choice
 if [ "$choice" = "1" ]; then
-export ANTHROPIC_BASE_URL="https://api.deepseek.com/anthropic"
-export ANTHROPIC_AUTH_TOKEN="$API_KEY"
-export ANTHROPIC_MODEL="deepseek-v4-flash"
-
+    echo "export ANTHROPIC_BASE_URL='https://api.deepseek.com/anthropic'" >> ~/.bashrc
+    echo "export ANTHROPIC_AUTH_TOKEN='$API_KEY'" >> ~/.bashrc
+    echo "export ANTHROPIC_MODEL='deepseek-v4-flash'" >> ~/.bashrc
 elif [ "$choice" = "2" ]; then
-export ANTHROPIC_BASE_URL="https://api.minimaxi.com/anthropic"
-export ANTHROPIC_AUTH_TOKEN="$API_KEY"
-export ANTHROPIC_MODEL="MiniMax-M3"
+    echo "export ANTHROPIC_BASE_URL='https://api.minimaxi.com/anthropic'" >> ~/.bashrc
+    echo "export ANTHROPIC_AUTH_TOKEN='$API_KEY'" >> ~/.bashrc
+    echo "export ANTHROPIC_MODEL='MiniMax-M3'" >> ~/.bashrc
 fi
 source ~/.bashrc
 
