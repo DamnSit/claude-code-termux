@@ -1,24 +1,36 @@
 read -p "请输入你的 API Key: " API_KEY
 
+if [ -z "$API_KEY" ]; then
+    echo "错误：API Key 不能为空！"
+    exit 1
+fi
+
 echo "请选择要配置的 API 服务："
 echo "1) DeepSeek (deepseek-v4-flash)"
 echo "2) MiniMax (MiniMax-M3)"
-
 read -p "请输入选项: " choice
 
-sudo sed -i '/^ANTHROPIC_/d' /etc/environment
-
-if [ "$choice" = "1" ]; then
-sudo sed -i '$a ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic' /etc/environment
-sudo sed -i '$a ANTHROPIC_AUTH_TOKEN='"$API_KEY" /etc/environment
-sudo sed -i '$a ANTHROPIC_MODEL=deepseek-v4-flash' /etc/environment
-elif [ "$choice" = "2" ]; then
-sudo sed -i '$a ANTHROPIC_BASE_URL=https://api.minimaxi.com/anthropic' /etc/environment
-sudo sed -i '$a ANTHROPIC_AUTH_TOKEN='"$API_KEY" /etc/environment
-sudo sed -i '$a ANTHROPIC_MODEL=MiniMax-M3' /etc/environment
+if [ "$choice" != "1" ] && [ "$choice" != "2" ]; then
+    echo "错误：无效选项"
+    exit 1
 fi
 
-curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/install.sh | bash
+if [ "$choice" = "1" ]; then
+    BASE_URL="https://api.deepseek.com/anthropic"
+    MODEL="deepseek-v4-flash"
+else
+    BASE_URL="https://api.minimaxi.com/anthropic"
+    MODEL="MiniMax-M3"
+fi
+
+# 删除旧配置
+sed -i '/ANTHROPIC_/d' ~/.bashrc
+
+# 在开头插入新配置
+sed -i "1i # Anthropic API Configuration\nexport ANTHROPIC_BASE_URL=\"$BASE_URL\"\nexport ANTHROPIC_AUTH_TOKEN=\"$API_KEY\"\nexport ANTHROPIC_MODEL=\"$MODEL\"\n" ~/.bashrc
+source ~/.bashrc
+
+
 
 # 创建配置目录（如果不存在）
 mkdir -p ~/.claude
