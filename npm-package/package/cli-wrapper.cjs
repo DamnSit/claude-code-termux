@@ -2,17 +2,20 @@
 // Termux/Android patched launcher
 // Patches: android -> linux for platform detection
 
-const { spawnSync } = require('child_process')
+const { spawnSync, spawn } = require('child_process')
 const { arch, constants } = require('os')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const readline = require('readline')
+const dns = require('dns')
+const net = require('net')
 
 const PACKAGE_PREFIX = '@anthropic-ai/claude-code'
 const BINARY_NAME = 'claude'
 const WRAPPER_NAME = require('./package.json').name
 const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000
+const LOCAL_PROXY_PORT = 41080
 
 const PLATFORMS = {
   'darwin-arm64': { pkg: PACKAGE_PREFIX + '-darwin-arm64', bin: BINARY_NAME },
@@ -106,10 +109,109 @@ function ensureGrun() {
 // against the real /etc/resolv.conf, which ENOENTs on Android — there's no
 // such file at that absolute path, Termux or not. The known fallback in that
 // situation is 127.0.0.1:53, so keep a tiny local forwarder listening there,
-// seeded with the device's actual DNS servers, so that fallback resolves
-// instead of refusing (old failure mode) or hanging to a timeout (current one).
-// No-ops if something is already listening. Opt out with
-// CLAUDE_CODE_TERMUX_NO_DNS_HELPER=1.
+// so that fallback resolves instead of refusing (old failure mode) or hanging
+// to a timeout (current one). Pure Node (dgram) — no external pkg required,
+// since `dnsmasq` isn't on every Termux mirror (confirmed: E: Unable to locate
+// package dnsmasq). Runs as its own detached process: the spawnSync call in
+// runNative() blocks this process's event loop for the whole claude session,
+// so an in-process forwarder would go deaf the moment it's needed. PID-file
+// guarded so repeat `claude` invocations don't pile up forwarders. Opt out
+// with CLAUDE_CODE_TERMUX_NO_DNS_HELPER=1.
+const FORWARDER_SRC = `
+const dgram = require('dgram')
+const fs = require('fs')
+const upstreams = [['8.8.8.8', 53], ['1.1.1.1', 53]]
+const server = dgram.createSocket('udp4')
+server.on('message', (msg, rinfo) => {
+  const [ip, port] = upstreams[Math.floor(Math.random() * upstreams.length)]
+  const up = dgram.createSocket('udp4')
+  const timer = setTimeout(() => { try { up.close() } catch {} }, 4000)
+  up.on('message', (reply) => {
+    clearTimeout(timer)
+    try { server.send(reply, rinfo.port, rinfo.address) } catch {}
+    try { up.close() } catch {}
+  })
+  up.on('error', () => { clearTimeout(timer); try { up.close() } catch {} })
+  up.send(msg, port, ip)
+})
+server.on('error', (err) => { try { fs.writeFileSync(process.argv[3], 'ERROR: ' + err.message) } catch {}; process.exit(1) })
+server.bind(53, '127.0.0.1', () => { fs.writeFileSync(process.argv[2], String(process.pid)) })
+`
+
+// ─── Self-healing: local HTTP CONNECT proxy, so the native binary never has
+// to resolve api.anthropic.com itself ──────────────────────────────────────
+// Claude Code officially honors HTTPS_PROXY/HTTP_PROXY. Point it at
+// 127.0.0.1:LOCAL_PROXY_PORT — a literal loopback IP needs no DNS lookup at
+// all — and let this tiny CONNECT tunnel (running under this wrapper's own,
+// presumably-working Termux/Bionic Node) do the actual getaddrinfo()+TCP to
+// the real host. This sidesteps whatever's broken in the glibc-side resolver
+// instead of trying to reproduce/patch it. Detached (same reason as the DNS
+// forwarder: spawnSync blocks this process's event loop for the whole claude
+// session). Only takes effect if the user hasn't already set their own
+// HTTPS_PROXY/HTTP_PROXY. Opt out with CLAUDE_CODE_TERMUX_NO_PROXY_HELPER=1.
+const PROXY_SRC = `
+const http = require('http')
+const net = require('net')
+const fs = require('fs')
+const server = http.createServer((_req, res) => { res.writeHead(405); res.end() })
+server.on('connect', (req, clientSocket, head) => {
+  const [host, portStr] = req.url.split(':')
+  const targetPort = Number(portStr) || 443
+  const upstream = net.connect(targetPort, host, () => {
+    clientSocket.write('HTTP/1.1 200 Connection Established\\r\\n\\r\\n')
+    if (head && head.length) upstream.write(head)
+    upstream.pipe(clientSocket)
+    clientSocket.pipe(upstream)
+  })
+  upstream.on('error', () => { try { clientSocket.end() } catch {} })
+  clientSocket.on('error', () => { try { upstream.end() } catch {} })
+})
+server.on('error', (err) => { try { fs.writeFileSync(process.argv[3], 'ERROR: ' + err.message) } catch {}; process.exit(1) })
+server.listen(${LOCAL_PROXY_PORT}, '127.0.0.1', () => { fs.writeFileSync(process.argv[2], String(process.pid)) })
+`
+
+let _proxyChecked = false
+function ensureLocalProxy(env) {
+  if (process.env.CLAUDE_CODE_TERMUX_NO_PROXY_HELPER === '1') return
+  const userSet = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy
+  if (userSet) return // respect an existing proxy config, don't override it
+
+  if (!_proxyChecked) {
+    _proxyChecked = true
+    const dir = path.join(os.homedir(), '.cache', 'claude-code-termux')
+    fs.mkdirSync(dir, { recursive: true })
+    const pidFile = path.join(dir, 'proxy.pid')
+    const errFile = path.join(dir, 'proxy.err')
+    const scriptFile = path.join(dir, 'proxy.cjs')
+
+    let alive = false
+    try {
+      const pid = Number(fs.readFileSync(pidFile, 'utf8').trim())
+      if (pid) { process.kill(pid, 0); alive = true }
+    } catch {}
+
+    if (!alive) {
+      try {
+        const prevErr = fs.readFileSync(errFile, 'utf8')
+        if (prevErr) console.error(`[${WRAPPER_NAME}] ⚠ local proxy previously failed: ${prevErr.trim()}`)
+      } catch {}
+      try {
+        fs.writeFileSync(scriptFile, PROXY_SRC)
+        const child = spawn(process.execPath, [scriptFile, pidFile, errFile], { detached: true, stdio: 'ignore' })
+        child.unref()
+        console.error(`[${WRAPPER_NAME}] ✓ local proxy launching on 127.0.0.1:${LOCAL_PROXY_PORT} (pid ${child.pid})`)
+      } catch (e) {
+        console.error(`[${WRAPPER_NAME}] ⚠ could not start local proxy: ${e.message}`)
+        return
+      }
+    }
+  }
+
+  env.HTTPS_PROXY = `http://127.0.0.1:${LOCAL_PROXY_PORT}`
+  env.HTTP_PROXY = `http://127.0.0.1:${LOCAL_PROXY_PORT}`
+  env.NO_PROXY = 'localhost,127.0.0.1'
+}
+
 let _resolverChecked = false
 function ensureResolver() {
   if (_resolverChecked) return
@@ -117,37 +219,29 @@ function ensureResolver() {
   if (!isTermux()) return
   if (process.env.CLAUDE_CODE_TERMUX_NO_DNS_HELPER === '1') return
 
-  const running = spawnSync('pgrep', ['-x', 'dnsmasq'], { encoding: 'utf8' })
-  if (running.status === 0 && running.stdout.trim()) return // already up
+  const dir = path.join(os.homedir(), '.cache', 'claude-code-termux')
+  fs.mkdirSync(dir, { recursive: true })
+  const pidFile = path.join(dir, 'dns-forwarder.pid')
+  const errFile = path.join(dir, 'dns-forwarder.err')
+  const scriptFile = path.join(dir, 'dns-forwarder.cjs')
 
-  if (!binExists('dnsmasq')) {
-    console.error(`[${WRAPPER_NAME}] dnsmasq not found — installing once...`)
-    spawnSync('pkg', ['install', 'dnsmasq', '-y'], { stdio: 'inherit' })
-    if (!binExists('dnsmasq')) {
-      console.error(`[${WRAPPER_NAME}] ⚠ could not install dnsmasq — DNS inside the glibc binary may still fail`)
-      return
-    }
-  }
-
-  const prop = (k) => (spawnSync('getprop', [k], { encoding: 'utf8' }).stdout || '').trim()
-  const dns1 = prop('net.dns1') || '8.8.8.8'
-  const dns2 = prop('net.dns2') || '1.1.1.1'
-
-  const PREFIX = process.env.PREFIX || '/data/data/com.termux/files/usr'
-  const conf = path.join(PREFIX, 'etc', 'dnsmasq-claude-code.conf')
   try {
-    fs.writeFileSync(conf, [
-      'no-resolv',
-      'no-poll',
-      'listen-address=127.0.0.1',
-      'bind-interfaces',
-      `server=${dns1}`,
-      `server=${dns2}`,
-    ].join('\n') + '\n')
-    spawnSync('dnsmasq', ['-C', conf], { stdio: 'ignore' }) // daemonizes itself
-    console.error(`[${WRAPPER_NAME}] ✓ local resolver up on 127.0.0.1:53 (upstream ${dns1}, ${dns2})`)
+    const pid = Number(fs.readFileSync(pidFile, 'utf8').trim())
+    if (pid) { process.kill(pid, 0); return } // still alive, nothing to do
+  } catch {} // no pidfile / stale pid — (re)launch below
+
+  try {
+    const prevErr = fs.readFileSync(errFile, 'utf8')
+    if (prevErr) console.error(`[${WRAPPER_NAME}] ⚠ local DNS forwarder previously failed: ${prevErr.trim()}`)
+  } catch {}
+
+  try {
+    fs.writeFileSync(scriptFile, FORWARDER_SRC)
+    const child = spawn(process.execPath, [scriptFile, pidFile, errFile], { detached: true, stdio: 'ignore' })
+    child.unref()
+    console.error(`[${WRAPPER_NAME}] ✓ local DNS forwarder launching on 127.0.0.1:53 (pid ${child.pid})`)
   } catch (e) {
-    console.error(`[${WRAPPER_NAME}] ⚠ could not start local resolver: ${e.message}`)
+    console.error(`[${WRAPPER_NAME}] ⚠ could not start local DNS forwarder: ${e.message}`)
   }
 }
 
@@ -394,6 +488,7 @@ function runNative(binaryPath, args) {
   const env = { ...process.env, CLAUDE_CODE_INSTALLED_VIA_NPM_WRAPPER: '1' }
   if (process.platform === 'android') {
     ensureResolver()
+    ensureLocalProxy(env)
     // Run grun via PATH first — exactly what worked in 2.1.146. No `which`
     // gatekeeping: some Termux setups lack the `which` binary, which made the
     // old detection fail even though `grun` ran fine. Only if grun is genuinely
@@ -411,6 +506,41 @@ function runNative(binaryPath, args) {
     return r
   }
   return spawnSync(binaryPath, args, { stdio: 'inherit', env })
+}
+
+// ─── Diagnostic: Termux-side (Bionic, no grun/glibc involved) reachability ───
+// Runs entirely in this Node process's own resolver/socket stack, so it's
+// ground truth for "is the network actually fine here" independent of
+// whatever grun + the glibc-linked binary do internally. Cheap (~1-2s worst
+// case) and only runs right before we'd invoke the native binary anyway.
+// Opt out with CLAUDE_CODE_TERMUX_NO_NET_PREFLIGHT=1.
+async function preflightNetworkCheck() {
+  if (process.env.CLAUDE_CODE_TERMUX_NO_NET_PREFLIGHT === '1') return
+  const host = 'api.anthropic.com'
+  const withTimeout = (p, ms) =>
+    Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))])
+
+  const t0 = Date.now()
+  let address
+  try {
+    ; ({ address } = await withTimeout(dns.promises.lookup(host), 5000))
+    console.error(`[${WRAPPER_NAME}] preflight: DNS ${host} -> ${address} (${Date.now() - t0}ms, Termux-side resolver)`)
+  } catch (e) {
+    console.error(`[${WRAPPER_NAME}] preflight: DNS lookup FAILED — ${e.message} (${Date.now() - t0}ms)`)
+    return
+  }
+
+  const t1 = Date.now()
+  try {
+    await withTimeout(new Promise((res, rej) => {
+      const sock = net.connect({ host: address, port: 443 })
+      sock.once('connect', () => { sock.destroy(); res() })
+      sock.once('error', rej)
+    }), 5000)
+    console.error(`[${WRAPPER_NAME}] preflight: TCP 443 to ${address} OK (${Date.now() - t1}ms)`)
+  } catch (e) {
+    console.error(`[${WRAPPER_NAME}] preflight: TCP 443 to ${address} FAILED — ${e.message} (${Date.now() - t1}ms)`)
+  }
 }
 
 // ─── Manager TUI ──────────────────────────────────────────────────────────────
@@ -700,6 +830,8 @@ async function main() {
     await runManager()
     process.exit(0)
   }
+
+  await preflightNetworkCheck()
 
   const binaryPath = getBinaryPath()
   const result = runNative(binaryPath, args)
