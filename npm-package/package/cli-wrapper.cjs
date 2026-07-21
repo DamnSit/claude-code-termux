@@ -511,11 +511,12 @@ function runNative(binaryPath, args) {
 // ─── Diagnostic: Termux-side (Bionic, no grun/glibc involved) reachability ───
 // Runs entirely in this Node process's own resolver/socket stack, so it's
 // ground truth for "is the network actually fine here" independent of
-// whatever grun + the glibc-linked binary do internally. Cheap (~1-2s worst
-// case) and only runs right before we'd invoke the native binary anyway.
-// Opt out with CLAUDE_CODE_TERMUX_NO_NET_PREFLIGHT=1.
+// whatever grun + the glibc-linked binary do internally. Confirmed the
+// DNS/proxy fix works (2026-07-21) — off by default now so normal launches
+// don't pay ~300ms for a check that's done its job. Opt in with
+// CLAUDE_CODE_TERMUX_NET_PREFLIGHT=1 if this ever needs debugging again.
 async function preflightNetworkCheck() {
-  if (process.env.CLAUDE_CODE_TERMUX_NO_NET_PREFLIGHT === '1') return
+  if (process.env.CLAUDE_CODE_TERMUX_NET_PREFLIGHT !== '1') return
   const host = 'api.anthropic.com'
   const withTimeout = (p, ms) =>
     Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))])
