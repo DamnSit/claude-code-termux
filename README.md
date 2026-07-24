@@ -226,7 +226,7 @@ curl -fsSL https://raw.githubusercontent.com/DamnSit/claude-code-termux/main/uni
 For npm installs:
 
 ```bash
-npm uninstall -g @xurxuo/claude-code-termux @anthropic-ai/claude-code-linux-arm64
+npm uninstall -g @xurxuo/claude-code-termux
 ```
 
 If the official package was installed by accident and took over the `claude` command:
